@@ -2,6 +2,15 @@ name: Deploy production
 
 on:
   workflow_dispatch:
+    inputs:
+      verified_sha:
+        description: Exact merged main SHA selected by Auto merge
+        required: false
+        type: string
+      source_pr:
+        description: Source pull request number, when dispatched by Auto merge
+        required: false
+        type: string
   workflow_run:
     workflows: [Verify]
     types: [completed]
@@ -29,18 +38,35 @@ jobs:
       - name: Checkout verified revision
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+          ref: ${{ inputs.verified_sha || github.event.workflow_run.head_sha || github.sha }}
 
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
 
-      - name: Verify manually requested revision
+      - name: Confirm dispatched SHA belongs to main
+        if: github.event_name == 'workflow_dispatch' && inputs.verified_sha != ''
+        env:
+          VERIFIED_SHA: ${{ inputs.verified_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
+          git merge-base --is-ancestor "$VERIFIED_SHA" origin/main
+
+      - name: Verify dispatched revision
         if: github.event_name == 'workflow_dispatch'
         run: |
           npm ci
           npm run verify
+
+      - name: Record delivery source
+        if: github.event_name == 'workflow_dispatch' && inputs.source_pr != ''
+        env:
+          SOURCE_PR: ${{ inputs.source_pr }}
+          VERIFIED_SHA: ${{ inputs.verified_sha }}
+        run: |
+          echo "Automatic delivery from PR #$SOURCE_PR at $VERIFIED_SHA." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Pull Vercel production configuration
         env:

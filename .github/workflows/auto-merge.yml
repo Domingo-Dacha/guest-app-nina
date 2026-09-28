@@ -1,0 +1,138 @@
+name: Auto merge
+
+on:
+  workflow_run:
+    workflows: [Verify]
+    types: [completed]
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: auto-merge-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check whether the pull request is eligible
+        id: eligibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+
+          pr_number="$(jq -r '.workflow_run.pull_requests[0].number // empty' "$GITHUB_EVENT_PATH")"
+          tested_base_sha="$(jq -r '.workflow_run.pull_requests[0].base.sha // empty' "$GITHUB_EVENT_PATH")"
+
+          if [[ -z "$pr_number" || -z "$tested_base_sha" ]]; then
+            echo "No pull request is attached to this Verify run; nothing to merge." >> "$GITHUB_STEP_SUMMARY"
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          pr_json="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr_number")"
+          author="$(jq -r '.user.login' <<<"$pr_json")"
+          base_ref="$(jq -r '.base.ref' <<<"$pr_json")"
+          current_base_sha="$(jq -r '.base.sha' <<<"$pr_json")"
+          head_ref="$(jq -r '.head.ref' <<<"$pr_json")"
+          head_sha="$(jq -r '.head.sha' <<<"$pr_json")"
+          head_repo="$(jq -r '.head.repo.full_name' <<<"$pr_json")"
+          state="$(jq -r '.state' <<<"$pr_json")"
+          draft="$(jq -r '.draft' <<<"$pr_json")"
+
+          case "$GITHUB_REPOSITORY" in
+            Domingo-Dacha/guest-app-template) expected_author="mcklauss73" ;;
+            Domingo-Dacha/guest-app-nina) expected_author="domingonina-cmd" ;;
+            Domingo-Dacha/guest-app-misha) expected_author="mcklauss73" ;;
+            Domingo-Dacha/guest-app-valeria) expected_author="Filippovski" ;;
+            *) expected_author="" ;;
+          esac
+
+          reason=""
+          if [[ -z "$expected_author" ]]; then
+            reason="repository is not in the competition allowlist"
+          elif [[ "${author,,}" != "${expected_author,,}" ]]; then
+            reason="PR author is not the trusted leader for this repository"
+          elif [[ "$state" != "open" || "$draft" != "false" ]]; then
+            reason="PR is not an open, ready-for-review pull request"
+          elif [[ "$base_ref" != "main" ]]; then
+            reason="base branch is not main"
+          elif [[ "$head_repo" != "$GITHUB_REPOSITORY" || "$head_ref" != codex/* ]]; then
+            reason="head must be a codex/* branch in the same repository"
+          elif [[ "$head_sha" != "$RUN_HEAD_SHA" ]]; then
+            reason="the verified SHA is no longer the current PR head"
+          elif [[ "$current_base_sha" != "$tested_base_sha" ]]; then
+            reason="main changed after this PR was tested; update the branch and rerun Verify"
+          fi
+
+          blocked_file=""
+          while IFS= read -r file; do
+            case "$file" in
+              .github/*|AGENTS.md|.env|.env.*|db/migrations/*|src/lib/auth/*|src/proxy.ts|scripts/generate-app-secrets.mjs|scripts/migrate.ts|scripts/reset-demo-data.ts)
+                blocked_file="$file"
+                break
+                ;;
+            esac
+          done < <(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$pr_number/files" --jq '.[].filename')
+
+          if [[ -z "$reason" && -n "$blocked_file" ]]; then
+            reason="protected file requires manual merge: $blocked_file"
+          fi
+
+          echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+          if [[ -n "$reason" ]]; then
+            echo "Auto merge skipped for PR #$pr_number: $reason." >> "$GITHUB_STEP_SUMMARY"
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "PR #$pr_number is eligible for automatic merge." >> "$GITHUB_STEP_SUMMARY"
+          echo "eligible=true" >> "$GITHUB_OUTPUT"
+
+      - name: Merge the verified pull request
+        id: merge
+        if: steps.eligibility.outputs.eligible == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.eligibility.outputs.pr_number }}
+          HEAD_SHA: ${{ steps.eligibility.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+
+          response="$(gh api --method PUT "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/merge" \
+            -f merge_method=merge \
+            -f sha="$HEAD_SHA")"
+
+          if [[ "$(jq -r '.merged' <<<"$response")" != "true" ]]; then
+            jq -r '.message' <<<"$response" >&2
+            exit 1
+          fi
+
+          merge_sha="$(jq -r '.sha' <<<"$response")"
+          echo "merge_sha=$merge_sha" >> "$GITHUB_OUTPUT"
+          echo "Merged PR #$PR_NUMBER as $merge_sha." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Start production deployment
+        if: steps.merge.outputs.merge_sha != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MERGE_SHA: ${{ steps.merge.outputs.merge_sha }}
+          PR_NUMBER: ${{ steps.eligibility.outputs.pr_number }}
+        run: |
+          gh workflow run deploy-production.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f verified_sha="$MERGE_SHA" \
+            -f source_pr="$PR_NUMBER"
+          echo "Queued Deploy production for exact merge SHA $MERGE_SHA." >> "$GITHUB_STEP_SUMMARY"

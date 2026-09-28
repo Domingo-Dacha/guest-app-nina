@@ -49,7 +49,16 @@ competition. Do not hard-code a product scenario before a team chooses one.
 
 ## Delivery
 
-- Make focused changes through pull requests. Do not bypass a red check.
+- Make focused changes through `codex/*` branches and pull requests. Do not
+  bypass a red check.
+- A ready PR authored by the repository's trusted team leader is merged
+  automatically after the complete `Verify` workflow succeeds, then its exact
+  merge SHA is dispatched to `Deploy production`. Do not ask the leader for a
+  separate merge or deploy confirmation for an eligible ordinary change.
+- Automatic merge is deliberately skipped for changes to workflows,
+  `AGENTS.md`, environment files, migrations, authentication/proxy code and
+  database/reset/secret scripts. Those changes require an explicit manual
+  review and merge.
 - Production deploys only the verified `main` revision through
   `.github/workflows/deploy-production.yml`. Never print, copy or commit the
   repository's `VERCEL_TEAM_TOKEN`; use the configured Actions secret and
