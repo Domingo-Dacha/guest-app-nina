@@ -29,6 +29,7 @@ export default async function Home() {
   return (
     <AppShell>
       <section className="hero">
+        <p className="status-badge">Команда Нина готова</p>
         <p className="eyebrow">Универсальный старт команды</p>
         <h1>Соберите полезный гостевой сценарий</h1>
         <p>
