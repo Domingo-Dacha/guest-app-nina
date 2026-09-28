@@ -92,6 +92,14 @@ export default async function Home() {
           </ul>
         </article>
       </section>
+      <a
+        className="button button--secondary"
+        href="https://domingodacha.ru/whattodo"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Гайд: чем заняться в Domingo Dacha
+      </a>
       <section
         className="section split-grid"
         aria-label="Инструкции и рекомендации"
