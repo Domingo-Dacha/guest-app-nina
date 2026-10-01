@@ -27,6 +27,8 @@ import {
   dateReason,
   money,
   pricedItem,
+  repriceItem,
+  quantityLimit,
   pricesChanged,
   serviceFor,
   shortDate,
@@ -76,7 +78,7 @@ export function ExtrasApp(props: Props) {
   const existing = cart.items.find((item) => item.id === editId);
   const draft: Selection | null = service
     ? (drafts[draftKey] ??
-      existing ?? {
+      (existing ? repriceItem(existing, catalog) : null) ?? {
         id: "",
         serviceId: service.id,
         date: service.id === "late-checkout" ? stay.checkOut : "",
@@ -732,11 +734,14 @@ export function ExtrasApp(props: Props) {
                       updateDraft({ quantity: Number(event.target.value) })
                     }
                   >
-                    {Array.from({ length: catalog.rules.maxSets }, (_, n) => (
-                      <option key={n + 1} value={n + 1}>
-                        {n + 1}
-                      </option>
-                    ))}
+                    {Array.from(
+                      { length: quantityLimit(service, catalog) },
+                      (_, n) => (
+                        <option key={n + 1} value={n + 1}>
+                          {n + 1}
+                        </option>
+                      ),
+                    )}
                   </select>
                 </>
               )}
@@ -864,7 +869,7 @@ export function ExtrasApp(props: Props) {
                         onClick={() => {
                           setDrafts((previous) => ({
                             ...previous,
-                            [item.id]: item,
+                            [item.id]: repriceItem(item, catalog),
                           }));
                           go("service", {
                             service: item.serviceId,
@@ -926,10 +931,16 @@ export function ExtrasApp(props: Props) {
                       Цены изменились. Новая сумма:{" "}
                       {money(
                         cartTotal(
-                          cart.items.map((item) => pricedItem(item, catalog)),
+                          cart.items.map((item) => repriceItem(item, catalog)),
                         ),
                       )}
                       . Подтвердите её перед оплатой.
+                      {cart.items.some(
+                        (item) =>
+                          item.serviceId === "breakfast" &&
+                          (item.servingsPerUnit ?? 2) === 2,
+                      ) &&
+                        " Завтрак теперь считается за человека; количество порций в старой корзине сохраняется."}
                     </Alert>
                     <Button
                       variant="secondary"

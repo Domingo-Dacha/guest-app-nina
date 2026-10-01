@@ -10,6 +10,7 @@ import { createSessionToken, SESSION_COOKIE } from "../../src/lib/auth/token";
 import {
   cartTotal,
   pricedItem,
+  repriceItem,
   serviceFor,
   validateCheckout,
   validateSelection,
@@ -69,7 +70,7 @@ async function setup(page: Page, context: BrowserContext) {
         state.cart.version++;
       } else if (command.action === "reprice") {
         state.cart.items = state.cart.items.map((i) =>
-          pricedItem(i, state.catalog),
+          repriceItem(i, state.catalog),
         );
         state.cart.version++;
       } else {
@@ -204,9 +205,9 @@ test("full extras journey keeps drafts, edits the cart, handles failed/cancelled
     .getByRole("button", { name: "Изменить", exact: true })
     .click();
   await expect(page.getByLabel("Интервал доставки")).toHaveValue("09:00–09:30");
-  await page.getByLabel("Количество наборов").selectOption("2");
+  await page.getByLabel("Количество человек").selectOption("2");
   await page.getByRole("button", { name: /Сохранить изменения/ }).click();
-  await expect(breakfastCard).toContainText(/2 наб/);
+  await expect(breakfastCard).toContainText(/2 чел/);
   await breakfastCard
     .getByRole("button", { name: "Удалить", exact: true })
     .click();
@@ -250,7 +251,7 @@ test("full extras journey keeps drafts, edits the cart, handles failed/cancelled
     page.getByText("Оплачено · Подтверждено", { exact: true }),
   ).toBeVisible();
   expect(harness.checkoutCalls()).toBe(1);
-  expect(harness.state.orders[0].total).toBe(1090000);
+  expect(harness.state.orders[0].total).toBe(990000);
   expect(harness.state.cart.items).toHaveLength(0);
   await page.screenshot({
     path: testInfo.outputPath("result.png"),
@@ -747,4 +748,96 @@ test("guest copy, service order and empty-category links stay consistent", async
   await expect(
     page.getByText(copy.find(([id]) => id === "sup")![2], { exact: true }),
   ).toBeVisible();
+});
+
+test("breakfast costs 900 per person through checkout and order history", async ({
+  page,
+  context,
+}) => {
+  const { state } = await setup(page, context);
+  await page.goto("/extras?view=service&service=breakfast");
+  await expect(page.locator(".extras-base-price")).toContainText(/900/);
+  await expect(page.locator(".extras-base-price")).toContainText(
+    "за 1 человека",
+  );
+  await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
+  await page.getByLabel("Интервал доставки").selectOption("09:00–09:30");
+  await page.getByLabel("Количество человек").selectOption("3");
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toContainText(/2\s*700/);
+  await page.getByRole("button", { name: /Добавить в корзину/ }).click();
+  await openCheckout(page);
+  await page.getByRole("button", { name: "Перейти к демооплате" }).click();
+  await page
+    .getByRole("button", { name: "Успешная демооплата", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Спасибо, заказ сохранён" }),
+  ).toBeVisible();
+  expect(state.orders[0].total).toBe(270000);
+  expect(state.orders[0].items[0]).toMatchObject({
+    quantity: 3,
+    servingsPerUnit: 1,
+    unitPrice: 90000,
+  });
+  await page.reload();
+  await expect(page.locator(".extras-item-summary")).toContainText(
+    /3 чел. × 900/,
+  );
+});
+
+test("legacy breakfast cart requires confirmation and keeps four portions when switching to per-person pricing", async ({
+  page,
+  context,
+}) => {
+  const { state } = await setup(page, context);
+  state.cart = {
+    version: 1,
+    items: [
+      {
+        ...pricedItem(
+          {
+            id: randomUUID(),
+            serviceId: "breakfast",
+            date: "2026-10-17",
+            time: "09:00–09:30",
+            quantity: 2,
+            decoration: false,
+          },
+          state.catalog,
+        ),
+        unitPrice: 190000,
+        servingsPerUnit: 2,
+      },
+    ],
+  };
+  await page.goto("/extras?view=cart");
+  await expect(page.locator(".extras-item-summary")).toContainText(
+    /2 наб. на двоих/,
+  );
+  await page.getByRole("button", { name: "К оформлению", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Перейти к демооплате" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByText(/количество порций в старой корзине сохраняется/),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Принять новую сумму" }).click();
+  await expect(page.locator(".extras-item-summary")).toContainText(
+    /4 чел. × 900/,
+  );
+  expect(state.cart.items[0]).toMatchObject({
+    quantity: 4,
+    servingsPerUnit: 1,
+    unitPrice: 90000,
+  });
+  await page.getByRole("button", { name: "Перейти к демооплате" }).click();
+  await page
+    .getByRole("button", { name: "Успешная демооплата", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Спасибо, заказ сохранён" }),
+  ).toBeVisible();
+  expect(state.orders[0].total).toBe(360000);
 });

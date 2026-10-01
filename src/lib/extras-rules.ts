@@ -173,10 +173,10 @@ export function validateSelection(
   if (
     !Number.isInteger(item.quantity) ||
     item.quantity < 1 ||
-    item.quantity > catalog.rules.maxSets ||
+    item.quantity > quantityLimit(service, catalog) ||
     (!service.quantityLabel && item.quantity !== 1)
   )
-    return "Проверьте количество наборов.";
+    return "Проверьте количество.";
   if (item.decoration && !service.addon)
     return "Для этой услуги нет такого дополнения.";
   if (item.fir && !service.firAddon)
@@ -195,10 +195,30 @@ export function isNewYearHoliday(date: string) {
   const monthDay = date.slice(5);
   return monthDay === "12-31" || (monthDay >= "01-01" && monthDay <= "01-10");
 }
+export function quantityLimit(service: ExtraService, catalog: ExtrasCatalog) {
+  return catalog.rules.maxSets * (service.id === "breakfast" ? 2 : 1);
+}
+// Missing metadata belongs to the old breakfast sold as a set for two.
+export const breakfastPortions = (
+  item: Pick<CartItem, "quantity" | "servingsPerUnit">,
+) => item.quantity * (item.servingsPerUnit ?? 2);
+export function repriceItem(item: CartItem, catalog: ExtrasCatalog): CartItem {
+  return pricedItem(
+    {
+      ...item,
+      quantity:
+        item.serviceId === "breakfast"
+          ? breakfastPortions(item)
+          : item.quantity,
+    },
+    catalog,
+  );
+}
 export function pricedItem(item: Selection, catalog: ExtrasCatalog): CartItem {
   const service = serviceFor(catalog, item.serviceId);
   return {
     ...item,
+    servingsPerUnit: 1,
     durationDays: item.durationDays ?? 1,
     fir: item.fir ?? false,
     robes: item.robes ?? 0,
@@ -229,8 +249,11 @@ export const cartTotal = (items: CartItem[]) =>
   items.reduce((sum, item) => sum + lineTotal(item), 0);
 export function pricesChanged(items: CartItem[], catalog: ExtrasCatalog) {
   return items.some((item) => {
-    const current = pricedItem(item, catalog);
+    const current = repriceItem(item, catalog);
     return (
+      current.quantity !== item.quantity ||
+      (item.serviceId === "breakfast" &&
+        current.servingsPerUnit !== item.servingsPerUnit) ||
       current.unitPrice !== item.unitPrice ||
       current.addonPrice !== item.addonPrice ||
       current.firPrice !== (item.firPrice ?? 0) ||

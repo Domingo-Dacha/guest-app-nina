@@ -34,13 +34,14 @@ async function setup(context: BrowserContext) {
     requestedTime: "09:00–09:30",
     confirmedTime: "09:00–09:30",
     quantity: 2,
+    servingsPerUnit: 1,
     robes: 0,
     decoration: false,
     fir: false,
     durationDays: 1,
     durationHours: null,
-    amount: 380000,
-    paidAmount: 380000,
+    amount: 180000,
+    paidAmount: 180000,
     paymentStatus: "paid",
     status: "new",
     version: 0,
@@ -71,7 +72,7 @@ async function setup(context: BrowserContext) {
         orderId,
         orderNumber: base.orderNumber,
         houseName: base.houseName,
-        total: 1380000,
+        total: 1180000,
         paymentStatus: "paid",
         status: "pending",
         version: 0,
@@ -104,8 +105,8 @@ async function setup(context: BrowserContext) {
         ? state.tasks
             .filter(
               (t) =>
-                t.date >= from &&
-                t.date <= to &&
+                (url.searchParams.get("scope") === "all" ||
+                  (t.date >= from && t.date <= to)) &&
                 (profile.role === "manager" || t.department === profile.role),
             )
             .sort(compareTasks)
@@ -122,7 +123,7 @@ async function setup(context: BrowserContext) {
                 )
               : [],
           writable: state.writable,
-          serverNow: "2026-10-16T10:00:00Z",
+          serverNow: "2026-10-01T10:00:00Z",
         },
       });
     }
@@ -178,7 +179,6 @@ async function setup(context: BrowserContext) {
 async function selectRole(page: Page, role: string) {
   await page.getByLabel("Демонстрационная роль").selectOption(role);
   await expect(page.getByLabel("Демонстрационная роль")).toBeEnabled();
-  await page.getByRole("button", { name: "Завтра", exact: true }).click();
 }
 const card = (page: Page, name: string) =>
   page
@@ -207,7 +207,7 @@ test("staff roles split an order, confirm a bath and synchronize kitchen work ac
     "Завтрак",
     "Бочка фурако",
   ]);
-  await expect(page.locator(".staff-kitchen")).toContainText("4 порц.");
+  await expect(page.locator(".staff-kitchen")).toContainText("2 порц.");
   await expect(card(page, "Бочка фурако")).not.toContainText("Взять в работу");
   await card(page, "Бочка фурако")
     .getByLabel("Согласованное время")
@@ -240,7 +240,7 @@ test("staff roles split an order, confirm a bath and synchronize kitchen work ac
     "Доставлен",
   );
   await kitchen.reload();
-  await kitchen.getByRole("button", { name: "Завтра", exact: true }).click();
+
   await expect(card(kitchen, "Завтрак").locator(".staff-status")).toHaveText(
     "Доставлен",
   );
@@ -262,7 +262,7 @@ test("staff roles split an order, confirm a bath and synchronize kitchen work ac
   await expect(card(page, "Бочка фурако").locator(".staff-status")).toHaveText(
     "Новый",
   );
-  expect(state.transfers[0].total).toBe(1380000);
+  expect(state.transfers[0].total).toBe(1180000);
   expect(state.tasks.every((t) => t.paymentStatus === "paid")).toBe(true);
   await page.getByLabel("Демонстрационная роль").selectOption("bath");
   await expect(page.locator(".staff-task h3")).toHaveText(["Бочка фурако"]);

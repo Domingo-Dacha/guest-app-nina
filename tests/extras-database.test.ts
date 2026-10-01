@@ -64,6 +64,9 @@ beforeAll(async () => {
   );
   await db.exec(await readFile("db/migrations/0004_extras_burger.sql", "utf8"));
   await db.exec(await readFile("db/migrations/0005_bath_packages.sql", "utf8"));
+  await db.exec(
+    await readFile("db/migrations/0007_breakfast_per_person.sql", "utf8"),
+  );
 }, 30000);
 afterAll(async () => {
   await db.close();
@@ -295,12 +298,12 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
     const command: ExtrasCommand = {
       action: "checkout",
       version: 2,
-      total: 1090000,
+      total: 990000,
       comment: "Демонстрация",
       key: randomUUID(),
     };
     const order = await repo("checkout").execute(command, stay, catalog, now);
-    expect(order?.total).toBe(1090000);
+    expect(order?.total).toBe(990000);
     expect(order?.paymentStatus).toBe("paid");
     expect(
       order?.items.find((i) => i.serviceId === "furako")?.fulfillmentStatus,
@@ -369,7 +372,7 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
         {
           action: "checkout",
           key: randomUUID(),
-          total: 190000,
+          total: 90000,
           comment: "",
           version: 1,
         },
@@ -383,7 +386,7 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
     updated.services.find((s) => s.id === "breakfast")!.price = 210000;
     await expect(
       repo("deadline").execute(
-        { action: "review", version: 1, total: 190000 },
+        { action: "review", version: 1, total: 90000 },
         stay,
         updated,
         now,
@@ -447,4 +450,58 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
     expect(orders[0]?.id).toBe(orders[1]?.id);
     expect(await repo("concurrent").listOrders(stay)).toHaveLength(1);
   });
+});
+
+it("converts an old unpaid breakfast cart to people without losing portions, then snapshots the new tariff", async () => {
+  const team = "legacy-breakfast-cart";
+  await add(team, "breakfast");
+  await db.query(
+    "update extras_cart_items set quantity=6,unit_price=190000,servings_per_unit=null where team_slug=$1",
+    [team],
+  );
+  const old = await repo(team).getCart(stay);
+  expect(old.items[0]).toMatchObject({
+    quantity: 6,
+    unitPrice: 190000,
+    servingsPerUnit: 2,
+  });
+  await expect(
+    repo(team).execute(
+      { action: "review", version: 1, total: 1140000 },
+      stay,
+      catalog,
+      now,
+    ),
+  ).rejects.toThrow("Цены изменились");
+  await repo(team).execute(
+    { action: "reprice", version: 1 },
+    stay,
+    catalog,
+    now,
+  );
+  const updated = await repo(team).getCart(stay);
+  expect(updated.items[0]).toMatchObject({
+    quantity: 12,
+    unitPrice: 90000,
+    servingsPerUnit: 1,
+  });
+  const order = await repo(team).execute(
+    {
+      action: "checkout",
+      version: 2,
+      key: randomUUID(),
+      total: 1080000,
+      comment: "",
+    },
+    stay,
+    catalog,
+    now,
+  );
+  expect(order!.items[0]).toMatchObject({
+    quantity: 12,
+    unitPrice: 90000,
+    servingsPerUnit: 1,
+  });
+  expect(order!.total).toBe(1080000);
+  expect((await repo(team).getCart(stay)).items).toEqual([]);
 });

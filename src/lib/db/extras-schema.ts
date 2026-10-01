@@ -28,6 +28,7 @@ const selection = () => ({
   quantity: integer("quantity").notNull(),
   decoration: boolean("decoration").notNull(),
   unitPrice: integer("unit_price").notNull(),
+  servingsPerUnit: integer("servings_per_unit"),
   addonPrice: integer("addon_price").notNull(),
   durationDays: integer("duration_days").notNull().default(1),
   fir: boolean("fir").notNull().default(false),

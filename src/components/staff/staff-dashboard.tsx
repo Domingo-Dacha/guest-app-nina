@@ -27,7 +27,7 @@ import {
   nextWorkStatus,
   taskStatusLabel,
 } from "@/lib/staff-rules";
-import { money, shortDate } from "@/lib/extras-rules";
+import { breakfastPortions, money, shortDate } from "@/lib/extras-rules";
 
 const filters = [
   ["all", "Все задания"],
@@ -90,7 +90,7 @@ function TaskCard({
         </p>
         <p className="staff-quantity">
           {task.serviceId === "breakfast"
-            ? `Наборов на двоих: ${task.quantity} · ${task.quantity * 2} порций`
+            ? `Человек: ${breakfastPortions(task)} · Порций: ${breakfastPortions(task)}${task.servingsPerUnit === 2 ? " (ранее заказанные наборы на двоих)" : ""}`
             : `Количество: ${task.quantity}`}
           {task.durationHours ? ` · Баня: ${task.durationHours} ч` : ""}
           {task.serviceId === "bath-vensky-furako" ? " · Фурако: 4 ч" : ""}
@@ -321,7 +321,8 @@ export function StaffDashboard({ initialDate }: { initialDate: string }) {
   const [data, setData] = useState<StaffSnapshot | null>(null),
     [from, setFrom] = useState(initialDate),
     [to, setTo] = useState(initialDate),
-    [period, setPeriod] = useState(false);
+    [period, setPeriod] = useState(false),
+    [allDates, setAllDates] = useState(true);
   const [filter, setFilter] = useState("all"),
     [department, setDepartment] = useState<Department | "all">("all"),
     [view, setView] = useState<"tasks" | "finance">("tasks");
@@ -335,7 +336,9 @@ export function StaffDashboard({ initialDate }: { initialDate: string }) {
   const refresh = useCallback(() => {
     const current = ++sequence.current;
     return fetch(
-      `/api/staff?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      allDates
+        ? "/api/staff?scope=all"
+        : `/api/staff?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
       { cache: "no-store" },
     )
       .then(async (response) => {
@@ -356,7 +359,7 @@ export function StaffDashboard({ initialDate }: { initialDate: string }) {
       .finally(() => {
         if (current === sequence.current) setLoading(false);
       });
-  }, [from, to]);
+  }, [from, to, allDates]);
   useEffect(() => {
     void refresh();
     const update = () => {
@@ -433,7 +436,7 @@ export function StaffDashboard({ initialDate }: { initialDate: string }) {
         portions: 0,
       };
       item.quantity += t.quantity;
-      item.portions += t.serviceId === "breakfast" ? t.quantity * 2 : 0;
+      item.portions += t.serviceId === "breakfast" ? breakfastPortions(t) : 0;
       acc[t.serviceId] = item;
       return acc;
     }, {}),
@@ -544,9 +547,24 @@ export function StaffDashboard({ initialDate }: { initialDate: string }) {
             <>
               <div className="staff-tabs" aria-label="Период заданий">
                 <Button
-                  variant={!period && from === today ? "primary" : "secondary"}
+                  variant={allDates ? "primary" : "secondary"}
                   disabled={busy}
                   onClick={() => {
+                    setAllDates(true);
+                    setPeriod(false);
+                  }}
+                >
+                  Все даты
+                </Button>
+                <Button
+                  variant={
+                    !allDates && !period && from === today
+                      ? "primary"
+                      : "secondary"
+                  }
+                  disabled={busy}
+                  onClick={() => {
+                    setAllDates(false);
                     setFrom(today);
                     setTo(today);
                     setPeriod(false);
@@ -556,12 +574,13 @@ export function StaffDashboard({ initialDate }: { initialDate: string }) {
                 </Button>
                 <Button
                   variant={
-                    !period && from === addDays(today, 1)
+                    !allDates && !period && from === addDays(today, 1)
                       ? "primary"
                       : "secondary"
                   }
                   disabled={busy}
                   onClick={() => {
+                    setAllDates(false);
                     setFrom(addDays(today, 1));
                     setTo(addDays(today, 1));
                     setPeriod(false);
@@ -574,6 +593,7 @@ export function StaffDashboard({ initialDate }: { initialDate: string }) {
                   disabled={busy}
                   onClick={() => {
                     setPeriod(true);
+                    setAllDates(false);
                     setFrom(today);
                     setTo(addDays(today, 30));
                   }}
@@ -597,6 +617,11 @@ export function StaffDashboard({ initialDate }: { initialDate: string }) {
                   </>
                 )}
               </div>
+              <p className="staff-meta">
+                {allDates
+                  ? "Показаны заказы на все даты. Сортировка — по дате оказания услуги."
+                  : `Дата услуги: ${shortDate(from || initialDate)}${to !== from ? ` — ${shortDate(to || initialDate)}` : ""}. Дата оплаты не влияет на этот фильтр.`}
+              </p>
               {period && (
                 <div className="staff-range">
                   <label>
@@ -680,14 +705,14 @@ export function StaffDashboard({ initialDate }: { initialDate: string }) {
                           {kitchenTotals
                             .map(
                               (t) =>
-                                `${t.name}: ${t.quantity} ${t.portions ? `наб. / ${t.portions} порц.` : "шт."}`,
+                                `${t.name}: ${t.portions ? `${t.portions} порц.` : `${t.quantity} шт.`}`,
                             )
                             .join(" · ")}
                         </p>
                         <small>
                           Включая ожидание согласования. Состав блюд пока не
-                          задан в гостевом меню; порции считаются для наборов
-                          завтрака на двоих.
+                          задан в гостевом меню; порции завтрака считаются по
+                          числу человек в заказе.
                         </small>
                       </div>
                     </aside>

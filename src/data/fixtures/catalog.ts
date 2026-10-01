@@ -39,8 +39,8 @@ export const catalogFixture = catalogFixtureSchema.parse({
       id: "breakfast",
       name: "Завтрак",
       description: extrasCopy.breakfast,
-      priceKopecks: 180000,
-      conditions: "Заказ до 18:00 предыдущего дня.",
+      priceKopecks: 90000,
+      conditions: "900 ₽ за 1 человека. Заказ до 18:00 предыдущего дня.",
     },
     {
       id: "late-checkout",
