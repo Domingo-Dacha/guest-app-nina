@@ -812,11 +812,10 @@ test("legacy breakfast cart requires confirmation and keeps four portions when s
       },
     ],
   };
-  await page.goto("/extras?view=cart");
+  await page.goto("/extras?view=checkout");
   await expect(page.locator(".extras-item-summary")).toContainText(
     /2 наб. на двоих/,
   );
-  await page.getByRole("button", { name: "К оформлению", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Перейти к демооплате" }),
   ).toBeDisabled();
