@@ -16,6 +16,22 @@ import {
   shortDate,
 } from "@/lib/extras-rules";
 
+export function ServicePhoto({
+  picture,
+}: {
+  picture: { src: string; alt: string };
+}) {
+  return (
+    <div className="extras-photo">
+      <Image
+        src={picture.src}
+        alt={picture.alt}
+        fill
+        sizes="(max-width: 680px) 100vw, 500px"
+      />
+    </div>
+  );
+}
 export function ServiceArt({
   service,
   photo = 0,
@@ -24,17 +40,7 @@ export function ServiceArt({
   photo?: number;
 }) {
   const picture = service.images?.[photo];
-  if (picture)
-    return (
-      <div className="extras-photo">
-        <Image
-          src={picture.src}
-          alt={picture.alt}
-          fill
-          sizes="(max-width: 680px) 100vw, 500px"
-        />
-      </div>
-    );
+  if (picture) return <ServicePhoto picture={picture} />;
   const Icon =
     service.category === "bath"
       ? Bath
