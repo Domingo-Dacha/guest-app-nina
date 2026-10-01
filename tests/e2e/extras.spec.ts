@@ -316,7 +316,7 @@ test("expanded catalog shows unknown prices, photos and Meridian-only sauna", as
   ).toBeVisible();
   await page.goto("/extras?category=bath");
   await expect(
-    page.getByRole("heading", { name: "Баня «Венский»" }),
+    page.getByRole("heading", { name: "Баня «Венский»", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Баня «Гавшино»" }),
@@ -324,12 +324,11 @@ test("expanded catalog shows unknown prices, photos and Meridian-only sauna", as
   await expect(page.getByRole("heading", { name: "Райская баня" })).toHaveCount(
     0,
   );
+  const venskyPhoto = page.getByAltText("Интерьер: Баня «Венский»").first();
+  await venskyPhoto.scrollIntoViewIfNeeded();
   await expect
     .poll(() =>
-      page
-        .getByAltText("Интерьер парной с панорамным окном — общее фото бань")
-        .first()
-        .evaluate((image) => (image as HTMLImageElement).naturalWidth),
+      venskyPhoto.evaluate((image) => (image as HTMLImageElement).naturalWidth),
     )
     .toBeGreaterThan(0);
   state.stay.houseName = "Меридиан";
@@ -337,6 +336,122 @@ test("expanded catalog shows unknown prices, photos and Meridian-only sauna", as
   await expect(
     page.getByRole("heading", { name: "Райская баня" }),
   ).toBeVisible();
+});
+test("bath package preserves dates, hours and robes, and firewood keeps quantities", async ({
+  page,
+  context,
+}, testInfo) => {
+  test.setTimeout(60_000);
+  const { state } = await setup(page, context);
+  await page.goto("/extras?view=service&service=bath-vensky");
+  await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
+  await page.getByLabel("Желаемое время начала").selectOption("16:00");
+  await page.getByLabel("Длительность бани").selectOption("3");
+  await page.getByLabel(/Халаты/).selectOption("2");
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toContainText(/11\s*500/);
+  await page.getByRole("button", { name: /Добавить фурако на 4 часа/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "Баня «Венский» + фурако", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Дата", { exact: true })).toHaveValue(
+    "2026-10-17",
+  );
+  await expect(page.getByLabel("Желаемое время начала")).toHaveValue("16:00");
+  await expect(page.getByLabel("Длительность бани")).toHaveValue("3");
+  await expect(page.getByLabel(/Халаты/)).toHaveValue("2");
+  await page.getByRole("checkbox", { name: /Украшение в бочку/ }).check();
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toContainText(/18\s*500/);
+  await page.screenshot({
+    path: testInfo.outputPath("bath-package.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: /Добавить в корзину/ }).click();
+  await page
+    .getByRole("button", { name: "Выбрать: Дрова", exact: true })
+    .click();
+  await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
+  await page.getByLabel("Количество упаковок по 5 кг").selectOption("2");
+  await page.getByRole("button", { name: /Добавить в корзину/ }).click();
+  await openCheckout(page);
+  await page.getByRole("button", { name: "Перейти к демооплате" }).click();
+  await page.getByRole("button", { name: "Успешная демооплата" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Спасибо, заказ сохранён" }),
+  ).toBeVisible();
+  expect(state.orders[0].total).toBe(2050000);
+  await page.reload();
+  await expect(
+    page
+      .locator(".extras-item-summary")
+      .filter({ hasText: "Баня «Венский» + фурако" }),
+  ).toContainText("Баня: 3 ч");
+  await page.goto("/extras?view=service&service=bath-gavshino");
+  await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
+  await page.getByLabel("Желаемое время начала").selectOption("16:00");
+  await page.getByLabel(/Халаты/).selectOption("2");
+  await page.getByLabel("Длительность бани").selectOption("4");
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toContainText(/11\s*000/);
+  state.stay.houseName = "Меридиан";
+  await page.goto("/extras?view=service&service=bath-paradise");
+  await expect(page.getByLabel("Дата", { exact: true })).toBeVisible();
+  await expect(page.getByLabel(/Халаты/)).toBeVisible();
+  await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
+  await page.getByLabel("Желаемое время начала").selectOption("16:00");
+  await page.getByLabel("Длительность бани").selectOption("4");
+  await page.getByLabel(/Халаты/).selectOption("2");
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toContainText(/13\s*500/);
+});
+test("New Year tariffs follow the selected date and separate sauna furako costs 6000", async ({
+  page,
+  context,
+}, testInfo) => {
+  const { state } = await setup(page, context);
+  state.stay.checkIn = "2026-12-30";
+  state.stay.checkOut = "2027-01-12";
+  state.serverNow = "2026-12-29T10:00:00Z";
+  await page.goto("/extras?view=service&service=bath-vensky");
+  await page.getByLabel("Дата", { exact: true }).selectOption("2026-12-30");
+  await page.getByLabel("Желаемое время начала").selectOption("16:00");
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toContainText(/8\s*000/);
+  await page.getByLabel("Дата", { exact: true }).selectOption("2026-12-31");
+  await page.getByLabel("Желаемое время начала").selectOption("16:00");
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toContainText(/10\s*000/);
+  await expect(page.getByText(/Применён новогодний тариф/)).toBeVisible();
+  await page.getByRole("button", { name: /Добавить фурако на 4 часа/ }).click();
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toContainText(/15\s*000/);
+  await page.getByLabel("Дата", { exact: true }).selectOption("2027-01-10");
+  await expect(page.locator(".extras-base-price")).toContainText(/15\s*000/);
+  await page.getByLabel("Дата", { exact: true }).selectOption("2027-01-11");
+  await expect(page.locator(".extras-base-price")).toContainText(/13\s*000/);
+  await page.goto("/extras?view=service&service=furako-vensky");
+  await page.getByLabel("Дата", { exact: true }).selectOption("2026-12-31");
+  await page.getByLabel("Желаемое время начала").selectOption("16:00");
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toContainText(/6\s*000/);
+  await page.screenshot({
+    path: testInfo.outputPath("separate-furako.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: /Добавить в корзину/ }).click();
+  expect(state.cart.items[0]).toMatchObject({
+    serviceId: "furako-vensky",
+    unitPrice: 600000,
+  });
 });
 test("furako duration and optional extras survive cart editing and order reload", async ({
   page,
@@ -392,36 +507,75 @@ test("furako duration and optional extras survive cart editing and order reload"
   await expect(page.locator(".extras-item-summary")).toContainText("Халат: 2");
   await expect(page.locator(".extras-item-summary")).toContainText("2 дня");
 });
-test("bicycles can be ordered free without going to payment", async ({
+test("basket opens a Telegram draft with the stay house and bicycles are retired", async ({
   page,
   context,
 }, testInfo) => {
   const { state } = await setup(page, context);
-  await page.goto("/extras?category=experiences");
-  await page
-    .getByRole("button", { name: "Выбрать: Велосипеды", exact: true })
-    .click();
-  await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
-  await page.getByLabel("Количество велосипедов").selectOption("2");
-  await page.getByRole("button", { name: /Добавить в корзину/ }).click();
-  await openCheckout(page);
-  await page
-    .getByRole("button", { name: "Оформить бесплатно", exact: true })
-    .click();
+  state.stay.houseName = "Меридиан & Лес";
+  await page.goto("/extras");
   await expect(
-    page.getByRole("heading", { name: "Спасибо, заказ сохранён" }),
+    page.getByRole("heading", { name: "Велосипеды", exact: true }),
+  ).toHaveCount(0);
+  await page.goto("/extras?view=service&service=bicycles");
+  await expect(
+    page.getByText("Эта услуга больше не доступна в разделе «Допуслуги»."),
   ).toBeVisible();
   await expect(
-    page.getByText("Без оплаты · Ожидает согласования", { exact: true }),
-  ).toBeVisible();
-  expect(state.orders[0]).toMatchObject({
-    total: 0,
-    paymentStatus: "not_required",
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toHaveCount(0);
+  await page.goto("/extras?category=food");
+  const card = page.locator("article").filter({
+    has: page.getByRole("heading", {
+      name: "Фермерская корзина",
+      exact: true,
+    }),
   });
+  await expect(card).not.toContainText("Время по согласованию");
+  await expect(card).not.toContainText("Стоимость уточняется");
+  await page
+    .getByRole("button", { name: "Выбрать: Фермерская корзина", exact: true })
+    .click();
+  for (const item of [
+    "Молоко — 1 л",
+    "Яйца — 10 шт.",
+    "Адыгейский козий сыр",
+    "Хлеб ржаной домашний",
+    "Подарок-сюрприз",
+  ])
+    await expect(page.getByText(item, { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Дата", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toHaveCount(0);
+  const orderLink = page.getByRole("link", { name: "Заказать", exact: true });
+  const url = new URL((await orderLink.getAttribute("href"))!);
+  expect(url.origin).toBe("https://t.me");
+  expect(url.pathname).toBe("/Margosch_ka");
+  expect(url.searchParams.get("text")).toBe(
+    "Я гость Domingo Dacha — дом Меридиан & Лес\nХочу заказать фермерскую корзину",
+  );
+  expect(state.orders).toHaveLength(0);
+  expect(state.cart.items).toHaveLength(0);
   await page.screenshot({
-    path: testInfo.outputPath("free-bicycles.png"),
+    path: testInfo.outputPath("farm-basket.png"),
     fullPage: true,
   });
+  // Intercept before clicking: verify navigation without contacting the real account.
+  await context.route("https://t.me/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<p>Telegram draft preview</p>",
+    }),
+  );
+  const popupPromise = page.waitForEvent("popup");
+  await orderLink.click();
+  const popup = await popupPromise;
+  await popup.waitForLoadState();
+  expect(new URL(popup.url()).searchParams.get("text")).toBe(
+    url.searchParams.get("text"),
+  );
+  await popup.close();
 });
 test("checkout rechecks a breakfast deadline that elapsed while the cart was open", async ({
   page,

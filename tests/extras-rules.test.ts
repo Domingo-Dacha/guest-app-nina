@@ -11,6 +11,7 @@ import {
   validateCheckout,
   validateSelection,
   availableForStay,
+  isNewYearHoliday,
 } from "@/lib/extras-rules";
 
 const stay: StayContext = {
@@ -34,6 +35,166 @@ const selection: Selection = {
 };
 const before = new Date("2026-10-16T14:59:59Z");
 describe("extras booking rules", () => {
+  it("prices bath extensions and extras, uses date tariffs, and rejects unsupported hours and overruns", () => {
+    const bath: Selection = {
+      ...selection,
+      serviceId: "bath-vensky",
+      time: "16:00",
+      durationHours: 3,
+      robes: 2,
+    };
+    expect(cartTotal([pricedItem(bath, catalog)])).toBe(1150000);
+    const special = structuredClone(catalog);
+    special.services.find((s) => s.id === "bath-vensky")!.priceByDate = {
+      "2026-10-17": 1000000,
+    };
+    expect(cartTotal([pricedItem(bath, special)])).toBe(1350000);
+    expect(pricesChanged([pricedItem(bath, catalog)], special)).toBe(true);
+    expect(validateSelection(bath, stay, catalog, before)).toBeNull();
+    expect(
+      validateSelection({ ...bath, durationHours: 13 }, stay, catalog, before),
+    ).toContain("длительность");
+    expect(
+      validateSelection(
+        { ...selection, durationHours: 3 },
+        stay,
+        catalog,
+        before,
+      ),
+    ).toContain("длительность");
+    expect(
+      validateSelection(
+        { ...bath, serviceId: "bath-vensky-furako", time: "21:00" },
+        stay,
+        catalog,
+        before,
+      ),
+    ).toContain("завершиться");
+    expect(
+      validateSelection(
+        { ...bath, date: stay.checkOut, time: "10:00" },
+        stay,
+        catalog,
+        before,
+      ),
+    ).toContain("завершиться");
+    const gavshino = serviceFor(catalog, "bath-gavshino");
+    expect(
+      timeReason(gavshino, bath.date, bath.time, stay, catalog, before),
+    ).toBeNull();
+    expect(
+      validateSelection(
+        { ...bath, serviceId: "bath-gavshino", durationHours: undefined },
+        stay,
+        catalog,
+        before,
+      ),
+    ).toBeNull();
+  });
+  it("applies the annual New Year tariff only from Dec 31 through Jan 10", () => {
+    for (const [date, expected] of [
+      ["2026-12-30", 800000],
+      ["2026-12-31", 1000000],
+      ["2027-01-01", 1000000],
+      ["2027-01-10", 1000000],
+      ["2027-01-11", 800000],
+      ["2028-12-31", 1000000],
+    ] as const) {
+      expect(
+        pricedItem(
+          { ...selection, serviceId: "bath-vensky", date, time: "16:00" },
+          catalog,
+        ).unitPrice,
+      ).toBe(expected);
+      expect(isNewYearHoliday(date)).toBe(expected === 1000000);
+    }
+    expect(isNewYearHoliday("")).toBe(false);
+    expect(
+      pricedItem(
+        { ...selection, serviceId: "bath-vensky-furako", date: "2027-01-10" },
+        catalog,
+      ).unitPrice,
+    ).toBe(1500000);
+    expect(
+      pricedItem(
+        { ...selection, serviceId: "bath-vensky-furako", date: "2027-01-11" },
+        catalog,
+      ).unitPrice,
+    ).toBe(1300000);
+    const holidayStay = {
+      ...stay,
+      checkIn: "2026-12-30",
+      checkOut: "2027-01-11",
+    };
+    const holiday = {
+      ...selection,
+      serviceId: "bath-vensky" as const,
+      date: "2026-12-31",
+      time: "16:00",
+      durationHours: 3,
+      robes: 2,
+    };
+    expect(cartTotal([pricedItem(holiday, catalog)])).toBe(1350000);
+    expect(() =>
+      validateCheckout(
+        [{ ...pricedItem(holiday, catalog), unitPrice: 1050000 }],
+        holidayStay,
+        catalog,
+        1150000,
+        before,
+      ),
+    ).toThrow("Цены изменились");
+  });
+  it("prices three-hour saunas and separate furako and preserves Meridian-only access", () => {
+    for (const [serviceId, price] of [
+      ["bath-gavshino", 750000],
+      ["bath-paradise", 1000000],
+    ] as const) {
+      const choice = { ...selection, serviceId, time: "16:00", robes: 2 };
+      expect(cartTotal([pricedItem(choice, catalog)])).toBe(price + 100000);
+      expect(
+        cartTotal([pricedItem({ ...choice, durationHours: 4 }, catalog)]),
+      ).toBe(price + 350000);
+      expect(
+        validateSelection(
+          { ...choice, durationHours: 2 },
+          { ...stay, houseName: "Меридиан" },
+          catalog,
+          before,
+        ),
+      ).toContain("длительность");
+      expect(
+        validateSelection(
+          choice,
+          { ...stay, houseName: "Меридиан" },
+          catalog,
+          before,
+        ),
+      ).toBeNull();
+    }
+    expect(
+      validateSelection(
+        { ...selection, serviceId: "bath-paradise", time: "16:00" },
+        stay,
+        catalog,
+        before,
+      ),
+    ).toContain("Меридиана");
+    expect(
+      cartTotal([
+        pricedItem(
+          {
+            ...selection,
+            serviceId: "furako-vensky",
+            time: "16:00",
+            robes: 2,
+            decoration: true,
+          },
+          catalog,
+        ),
+      ]),
+    ).toBe(900000);
+  });
   it("prices both furako days and independent optional extras without enabling them by default", () => {
     const bath: Selection = {
       ...selection,
@@ -91,25 +252,36 @@ describe("extras booking rules", () => {
       ),
     ).toContain("Меридиана");
   });
-  it("allows zero-cost bicycles with agreement and rejects a past departure", () => {
+  it("blocks retired bicycles and external basket checkout while retaining historical prices", () => {
     const bikes: Selection = {
       ...selection,
       serviceId: "bicycles",
       time: "По согласованию",
       quantity: 2,
     };
-    expect(validateSelection(bikes, stay, catalog, before)).toBeNull();
+    expect(validateSelection(bikes, stay, catalog, before)).toContain(
+      "больше не доступна",
+    );
     expect(() =>
       validateCheckout([pricedItem(bikes, catalog)], stay, catalog, 0, before),
-    ).not.toThrow();
+    ).toThrow("больше не доступна");
     expect(
       validateSelection(
-        { ...bikes, date: stay.checkOut },
+        { ...bikes, serviceId: "sup", date: stay.checkOut },
         stay,
         catalog,
         new Date("2026-10-18T09:00:00Z"),
       ),
     ).toContain("завершилось");
+    expect(cartTotal([pricedItem(bikes, catalog)])).toBe(0);
+    expect(
+      validateSelection(
+        { ...bikes, serviceId: "farm-basket" },
+        stay,
+        catalog,
+        before,
+      ),
+    ).toContain("Telegram");
     expect(
       cartTotal([pricedItem({ ...bikes, serviceId: "sup" }, catalog)]),
     ).toBe(400000);

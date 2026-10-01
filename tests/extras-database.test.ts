@@ -63,11 +63,135 @@ beforeAll(async () => {
     await readFile("db/migrations/0003_extras_catalog.sql", "utf8"),
   );
   await db.exec(await readFile("db/migrations/0004_extras_burger.sql", "utf8"));
+  await db.exec(await readFile("db/migrations/0005_bath_packages.sql", "utf8"));
 }, 30000);
 afterAll(async () => {
   await db.close();
 });
 describe("extras PostgreSQL persistence (isolated, no server or external database)", () => {
+  it("stores new sauna tariffs, extensions and robes as paid order snapshots", async () => {
+    const meridianStay = { ...stay, houseName: "Меридиан" };
+    for (const [serviceId, total] of [
+      ["bath-gavshino", 1100000],
+      ["bath-paradise", 1350000],
+      ["furako-vensky", 700000],
+    ] as const) {
+      const repository = repo(serviceId);
+      await repository.execute(
+        {
+          action: "save",
+          version: 0,
+          item: {
+            id: randomUUID(),
+            serviceId,
+            date: "2026-10-17",
+            time: "16:00",
+            quantity: 1,
+            decoration: false,
+            robes: 2,
+            ...(serviceId !== "furako-vensky" ? { durationHours: 4 } : {}),
+          },
+        },
+        meridianStay,
+        catalog,
+        now,
+      );
+      await repository.execute(
+        {
+          action: "checkout",
+          version: 1,
+          total,
+          key: randomUUID(),
+          comment: "",
+        },
+        meridianStay,
+        catalog,
+        now,
+      );
+      const [order] = await repository.listOrders(meridianStay);
+      expect(order.total).toBe(total);
+      expect(order.items[0]).toMatchObject({
+        robes: 2,
+        robePrice: 50000,
+        fulfillmentStatus: "awaiting_approval",
+      });
+      expect(order.items[0].durationHours).toBe(
+        serviceId === "furako-vensky" ? undefined : 4,
+      );
+    }
+  });
+  it("persists bath package duration, robes and decoration together with firewood quantities", async () => {
+    const packageItem = {
+      id: randomUUID(),
+      serviceId: "bath-vensky-furako" as const,
+      date: "2026-10-17",
+      time: "16:00",
+      quantity: 1,
+      decoration: true,
+      robes: 2,
+      durationHours: 3,
+    };
+    await repo("package").execute(
+      { action: "save", version: 0, item: packageItem },
+      stay,
+      catalog,
+      now,
+    );
+    await repo("package").execute(
+      {
+        action: "save",
+        version: 1,
+        item: {
+          id: randomUUID(),
+          serviceId: "firewood",
+          date: "2026-10-17",
+          time: "По согласованию",
+          quantity: 2,
+          decoration: false,
+        },
+      },
+      stay,
+      catalog,
+      now,
+    );
+    const cart = await repo("package").getCart(stay);
+    expect(
+      cart.items.find((i) => i.serviceId === "bath-vensky-furako"),
+    ).toMatchObject({
+      durationHours: 3,
+      robes: 2,
+      unitPrice: 1550000,
+      addonPrice: 200000,
+      robePrice: 50000,
+    });
+    await repo("package").execute(
+      {
+        action: "checkout",
+        version: 2,
+        key: randomUUID(),
+        total: 2050000,
+        comment: "",
+      },
+      stay,
+      catalog,
+      now,
+    );
+    const [order] = await repo("package").listOrders(stay);
+    expect(order.total).toBe(2050000);
+    expect(
+      order.items.find((i) => i.serviceId === "bath-vensky-furako"),
+    ).toMatchObject({
+      durationHours: 3,
+      robes: 2,
+      decoration: true,
+      fulfillmentStatus: "awaiting_approval",
+    });
+    expect(order.items.find((i) => i.serviceId === "firewood")).toMatchObject({
+      quantity: 2,
+      unitPrice: 100000,
+    });
+    expect((await repo("package").getCart(stay)).items).toHaveLength(0);
+  });
   it("preserves historical order prices while migrating defaults for new options", async () => {
     const [order] = await repo("legacy").listOrders(stay);
     expect(order.total).toBe(600000);
@@ -127,7 +251,9 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
       robePrice: 50000,
     });
   });
-  it("saves a free bicycle order without marking it paid", async () => {
+  it("keeps historical free bicycle orders readable after retiring the service", async () => {
+    const legacyCatalog = structuredClone(catalog);
+    legacyCatalog.services.find((s) => s.id === "bicycles")!.retired = false;
     await repo("free").execute(
       {
         action: "save",
@@ -142,7 +268,7 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
         },
       },
       stay,
-      catalog,
+      legacyCatalog,
       now,
     );
     const command = {
@@ -152,10 +278,13 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
       comment: "",
       total: 0,
     };
-    const order = await repo("free").execute(command, stay, catalog, now);
+    const order = await repo("free").execute(command, stay, legacyCatalog, now);
     expect(order).toMatchObject({ total: 0, paymentStatus: "not_required" });
     expect(order?.items[0].fulfillmentStatus).toBe("awaiting_approval");
     expect((await repo("free").getCart(stay)).items).toHaveLength(0);
+    expect((await repo("free").listOrders(stay))[0].items[0].name).toBe(
+      "Велосипеды",
+    );
     expect((await repo("free").execute(command, stay, catalog, now))?.id).toBe(
       order?.id,
     );

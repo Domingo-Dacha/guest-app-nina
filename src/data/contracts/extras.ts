@@ -9,10 +9,13 @@ export const serviceIdSchema = z.enum([
   "burger",
   "dinner",
   "bath-vensky",
+  "bath-vensky-furako",
+  "furako-vensky",
   "bath-gavshino",
   "bath-paradise",
   "sup",
   "bicycles",
+  "firewood",
 ]);
 export type ServiceId = z.infer<typeof serviceIdSchema>;
 export type CategoryId =
@@ -44,14 +47,25 @@ export type ExtraService = {
   unit: string;
   confirmation: "automatic" | "manual";
   times: string[];
+  retired?: boolean;
+  telegramOrder?: { username: string };
   addon?: { name: string; price: number };
-  firAddon?: { name: string; price: number };
+  firAddon?: {
+    name: string;
+    price: number;
+    image?: { src: string; alt: string };
+  };
   robeAddon?: {
     name: string;
     price: number;
     image?: { src: string; alt: string };
   };
   durations?: { days: 1 | 2; price: number }[];
+  hourly?: { included: number; extraHourPrice: number; max: number };
+  sessionHours?: number;
+  packageServiceId?: ServiceId;
+  priceByDate?: Record<string, number>;
+  newYearPrice?: number;
   images?: { src: string; alt: string }[];
   allowedHouses?: string[];
   timing?: "agreement";
@@ -72,6 +86,7 @@ export const selectionSchema = z.object({
   durationDays: z.union([z.literal(1), z.literal(2)]).optional(),
   fir: z.boolean().optional(),
   robes: z.number().int().min(0).max(6).optional(),
+  durationHours: z.number().int().min(2).max(12).optional(),
 });
 export type Selection = z.infer<typeof selectionSchema>;
 export type CartItem = Selection & {

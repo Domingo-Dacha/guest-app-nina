@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
+import { farmBasketLink, farmBasketMessage } from "@/lib/farm-basket-order";
 import type {
   ExtraOrder,
   ExtrasCatalog,
@@ -34,6 +35,7 @@ import {
   validateSelection,
   availableForStay,
   serviceBlockReason,
+  isNewYearHoliday,
 } from "@/lib/extras-rules";
 import {
   ItemSummary,
@@ -88,8 +90,8 @@ export function ExtrasApp(props: Props) {
     ? validateSelection(draft, stay, catalog, now)
     : null;
   const blockedService = service ? serviceBlockReason(service, stay) : null;
-  const visibleServices = catalog.services.filter((s) =>
-    availableForStay(s, stay),
+  const visibleServices = catalog.services.filter(
+    (s) => !s.retired && availableForStay(s, stay),
   );
   const stalePrices = pricesChanged(cart.items, catalog);
   const cartIssues = cart.items
@@ -379,21 +381,25 @@ export function ExtrasApp(props: Props) {
                     <h2>{s.name}</h2>
                     <p>{s.summary}</p>
                     <p className="extras-note">
-                      {s.confirmation === "manual"
-                        ? "Время по согласованию"
-                        : "Заказ до 18:00 накануне"}
+                      {s.telegramOrder
+                        ? "Доставка от фермы «МАРГО»"
+                        : s.confirmation === "manual"
+                          ? "Время по согласованию"
+                          : "Заказ до 18:00 накануне"}
                     </p>
                     <div className="extras-card-action">
-                      <div>
-                        <strong>
-                          {s.price === null
-                            ? "Стоимость уточняется"
-                            : s.price === 0
-                              ? "Бесплатно"
-                              : money(s.price)}
-                        </strong>
-                        <span>{s.unit}</span>
-                      </div>
+                      {!s.telegramOrder && (
+                        <div>
+                          <strong>
+                            {s.price === null
+                              ? "Стоимость уточняется"
+                              : s.price === 0
+                                ? "Бесплатно"
+                                : money(s.price)}
+                          </strong>
+                          <span>{s.unit}</span>
+                        </div>
+                      )}
                       <Button
                         aria-label={`Выбрать: ${s.name}`}
                         onClick={() => go("service", { service: s.id })}
@@ -431,7 +437,9 @@ export function ExtrasApp(props: Props) {
               </div>
             )}
             <div className="extras-detail-copy">
-              <p>{service.description}</p>
+              {service.description.split("\n\n").map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
               {service.includes.length > 0 && <h2>Что входит</h2>}
               <ul>
                 {service.includes.map((text) => (
@@ -448,7 +456,30 @@ export function ExtrasApp(props: Props) {
               </Alert>
             </div>
           </div>
-          {blockedService ? (
+          {service.telegramOrder ? (
+            <div className="extras-panel extras-form">
+              <h2>Заказ у фермы «МАРГО»</h2>
+              <p>
+                Откроется чат с Марго. Название дома уже добавлено в сообщение:
+              </p>
+              <p className="extras-comment">{farmBasketMessage(stay)}</p>
+              <a
+                className="button button--primary"
+                href={farmBasketLink(service.telegramOrder.username, stay)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Заказать
+              </a>
+              <p className="extras-note">
+                Отправьте сообщение в Telegram. Марго подтвердит стоимость и
+                доставку в переписке.
+              </p>
+            </div>
+          ) : blockedService &&
+            !(
+              service.category === "bath" && availableForStay(service, stay)
+            ) ? (
             <div className="extras-panel">
               <h2>
                 {service.price === null
@@ -467,18 +498,98 @@ export function ExtrasApp(props: Props) {
             >
               <div className="extras-base-price">
                 <strong>
-                  {service.price === 0
-                    ? "Бесплатно"
-                    : money(pricedItem(draft, catalog).unitPrice)}
+                  {service.price === null
+                    ? "Стоимость уточняется"
+                    : service.price === 0
+                      ? "Бесплатно"
+                      : money(pricedItem(draft, catalog).unitPrice)}
                 </strong>
                 <span>
                   {service.durations
                     ? draft.durationDays === 2
                       ? "за 2 дня"
                       : "за 1 день"
-                    : service.unit}
+                    : service.hourly
+                      ? `баня ${draft.durationHours ?? service.hourly.included} ч${service.sessionHours ? ` + фурако ${service.sessionHours} ч` : ""}`
+                      : service.unit}
                 </span>
               </div>
+              {service.newYearPrice !== undefined && (
+                <p className="extras-note">
+                  {isNewYearHoliday(draft.date)
+                    ? "Применён новогодний тариф. "
+                    : ""}
+                  С 31 декабря по 10 января включительно —{" "}
+                  {money(service.newYearPrice)} за{" "}
+                  {service.hourly?.included ?? service.sessionHours} ч бани
+                  {service.sessionHours
+                    ? ` и ${service.sessionHours} ч фурако`
+                    : ""}
+                  .
+                </p>
+              )}
+              {service.hourly && (
+                <>
+                  <label htmlFor="extra-hours">Длительность бани</label>
+                  <select
+                    id="extra-hours"
+                    value={draft.durationHours ?? service.hourly.included}
+                    disabled={busy}
+                    onChange={(event) =>
+                      updateDraft({ durationHours: Number(event.target.value) })
+                    }
+                  >
+                    {Array.from(
+                      {
+                        length:
+                          service.hourly.max - service.hourly.included + 1,
+                      },
+                      (_, n) => n + service.hourly!.included,
+                    ).map((hours) => (
+                      <option key={hours} value={hours}>
+                        {hours} ч
+                      </option>
+                    ))}
+                  </select>
+                  <p className="extras-note">
+                    Включено {service.hourly.included} ч; каждый дополнительный
+                    час — {money(service.hourly.extraHourPrice)}.
+                  </p>
+                </>
+              )}
+              {service.packageServiceId && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => {
+                    const target = serviceFor(
+                      catalog,
+                      service.packageServiceId!,
+                    );
+                    setDrafts((previous) => ({
+                      ...previous,
+                      [editId ?? target.id]: {
+                        ...draft,
+                        id: draft.id || crypto.randomUUID(),
+                        serviceId: target.id,
+                      },
+                    }));
+                    go("service", {
+                      service: target.id,
+                      ...(editId ? { edit: editId } : {}),
+                    });
+                  }}
+                >
+                  Добавить фурако на 4 часа · +
+                  {money(
+                    pricedItem(
+                      { ...draft, serviceId: service.packageServiceId },
+                      catalog,
+                    ).unitPrice - pricedItem(draft, catalog).unitPrice,
+                  )}
+                </Button>
+              )}
               {service.durations && (
                 <>
                   <label htmlFor="extra-duration">Длительность</label>
@@ -559,7 +670,9 @@ export function ExtrasApp(props: Props) {
                       ? "Интервал доставки"
                       : service.id === "furako"
                         ? "Желаемое время готовности"
-                        : "Желаемое время выезда"}
+                        : service.id === "late-checkout"
+                          ? "Желаемое время выезда"
+                          : "Желаемое время начала"}
                   </label>
                   <select
                     id="extra-time"
@@ -593,6 +706,12 @@ export function ExtrasApp(props: Props) {
                     })}
                   </select>
                   <p className="extras-note">Время объекта — московское.</p>
+                  {service.category === "bath" && (
+                    <p className="extras-note">
+                      Вы выбираете желаемое время, а не свободный слот.
+                      Посещение требует подтверждения.
+                    </p>
+                  )}
                 </>
               )}
               {service.quantityLabel && (
@@ -633,20 +752,25 @@ export function ExtrasApp(props: Props) {
                 </label>
               )}
               {service.firAddon && (
-                <label className="extras-addon">
-                  <input
-                    type="checkbox"
-                    checked={draft.fir ?? false}
-                    disabled={busy}
-                    onChange={(event) =>
-                      updateDraft({ fir: event.target.checked })
-                    }
-                  />
-                  <span>
-                    {service.firAddon.name}
-                    <small>+{money(service.firAddon.price)}</small>
-                  </span>
-                </label>
+                <>
+                  {service.firAddon.image && (
+                    <ServicePhoto picture={service.firAddon.image} />
+                  )}
+                  <label className="extras-addon">
+                    <input
+                      type="checkbox"
+                      checked={draft.fir ?? false}
+                      disabled={busy}
+                      onChange={(event) =>
+                        updateDraft({ fir: event.target.checked })
+                      }
+                    />
+                    <span>
+                      {service.firAddon.name}
+                      <small>+{money(service.firAddon.price)}</small>
+                    </span>
+                  </label>
+                </>
               )}
               {service.robeAddon && (
                 <>
@@ -678,14 +802,22 @@ export function ExtrasApp(props: Props) {
                   {formReason}
                 </p>
               )}
-              <Button
-                type="submit"
-                disabled={busy || !data?.writable || Boolean(formReason)}
-              >
-                {busy
-                  ? "Сохраняем…"
-                  : `${editId ? "Сохранить изменения" : "Добавить в корзину"} · ${money(cartTotal([pricedItem(draft, catalog)]))}`}
-              </Button>
+              {service.price === null ? (
+                <p className="extras-note">
+                  Можно выбрать пожелания по дате, времени и халатам. Пока
+                  стоимость не определена, выбор не отправляется и оформление
+                  недоступно.
+                </p>
+              ) : (
+                <Button
+                  type="submit"
+                  disabled={busy || !data?.writable || Boolean(formReason)}
+                >
+                  {busy
+                    ? "Сохраняем…"
+                    : `${editId ? "Сохранить изменения" : "Добавить в корзину"} · ${money(cartTotal([pricedItem(draft, catalog)]))}`}
+                </Button>
+              )}
             </form>
           )}
         </div>
