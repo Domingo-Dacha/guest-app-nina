@@ -1,10 +1,23 @@
 import { z } from "zod";
 
-export const serviceIdSchema = z.enum(["furako", "breakfast", "late-checkout"]);
+export const serviceIdSchema = z.enum([
+  "furako",
+  "breakfast",
+  "late-checkout",
+  "farm-basket",
+  "lunch",
+  "dinner",
+  "bath-vensky",
+  "bath-gavshino",
+  "bath-paradise",
+  "sup",
+  "bicycles",
+]);
 export type ServiceId = z.infer<typeof serviceIdSchema>;
 export type CategoryId =
   "food" | "bath" | "experiences" | "occasion" | "comfort";
-export type PaymentStatus = "paid" | "refund_pending" | "refunded";
+export type PaymentStatus =
+  "paid" | "not_required" | "refund_pending" | "refunded";
 export type FulfillmentStatus =
   "awaiting_approval" | "confirmed" | "completed" | "cancelled";
 export type StayContext = {
@@ -26,11 +39,18 @@ export type ExtraService = {
   description: string;
   includes: string[];
   conditions: string;
-  price: number;
+  price: number | null;
   unit: string;
   confirmation: "automatic" | "manual";
   times: string[];
   addon?: { name: string; price: number };
+  firAddon?: { name: string; price: number };
+  robeAddon?: { name: string; price: number };
+  durations?: { days: 1 | 2; price: number }[];
+  images?: { src: string; alt: string }[];
+  allowedHouses?: string[];
+  timing?: "agreement";
+  quantityLabel?: string;
 };
 export type ExtrasCatalog = {
   categories: { id: CategoryId; name: string }[];
@@ -44,9 +64,17 @@ export const selectionSchema = z.object({
   time: z.string().min(1).max(20),
   quantity: z.number().int().min(1).max(6),
   decoration: z.boolean(),
+  durationDays: z.union([z.literal(1), z.literal(2)]).optional(),
+  fir: z.boolean().optional(),
+  robes: z.number().int().min(0).max(6).optional(),
 });
 export type Selection = z.infer<typeof selectionSchema>;
-export type CartItem = Selection & { unitPrice: number; addonPrice: number };
+export type CartItem = Selection & {
+  unitPrice: number;
+  addonPrice: number;
+  firPrice?: number;
+  robePrice?: number;
+};
 export type Cart = { version: number; items: CartItem[] };
 export type OrderItem = CartItem & {
   name: string;
@@ -80,13 +108,13 @@ export const extrasCommandSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("review"),
     version,
-    total: z.number().int().min(1),
+    total: z.number().int().min(0),
   }),
   z.object({
     action: z.literal("checkout"),
     version,
     key: z.uuid(),
-    total: z.number().int().min(1),
+    total: z.number().int().min(0),
     comment: z.string().trim().max(1000),
   }),
 ]);

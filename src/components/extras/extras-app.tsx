@@ -32,6 +32,8 @@ import {
   stayDates,
   timeReason,
   validateSelection,
+  availableForStay,
+  serviceBlockReason,
 } from "@/lib/extras-rules";
 import { ItemSummary, OrderDetails, ServiceArt } from "./extras-parts";
 
@@ -72,11 +74,18 @@ export function ExtrasApp(props: Props) {
         time: "",
         quantity: 1,
         decoration: false,
+        durationDays: 1,
+        fir: false,
+        robes: 0,
       })
     : null;
   const formReason = draft
     ? validateSelection(draft, stay, catalog, now)
     : null;
+  const blockedService = service ? serviceBlockReason(service, stay) : null;
+  const visibleServices = catalog.services.filter((s) =>
+    availableForStay(s, stay),
+  );
   const stalePrices = pricesChanged(cart.items, catalog);
   const cartIssues = cart.items
     .map((item) => ({
@@ -337,7 +346,7 @@ export function ExtrasApp(props: Props) {
             {[
               { id: "all", name: "Все" },
               ...catalog.categories.filter((c) =>
-                catalog.services.some((s) => s.category === c.id),
+                visibleServices.some((s) => s.category === c.id),
               ),
             ].map((c) => (
               <button
@@ -350,7 +359,7 @@ export function ExtrasApp(props: Props) {
             ))}
           </div>
           <div className="extras-catalog">
-            {catalog.services
+            {visibleServices
               .filter((s) => category === "all" || s.category === category)
               .map((s) => (
                 <article className="extras-service-card" key={s.id}>
@@ -371,7 +380,13 @@ export function ExtrasApp(props: Props) {
                     </p>
                     <div className="extras-card-action">
                       <div>
-                        <strong>{money(s.price)}</strong>
+                        <strong>
+                          {s.price === null
+                            ? "Стоимость уточняется"
+                            : s.price === 0
+                              ? "Бесплатно"
+                              : money(s.price)}
+                        </strong>
                         <span>{s.unit}</span>
                       </div>
                       <Button
@@ -385,7 +400,7 @@ export function ExtrasApp(props: Props) {
                 </article>
               ))}
           </div>
-          {!catalog.services.some(
+          {!visibleServices.some(
             (s) => category === "all" || s.category === category,
           ) && (
             <div className="empty-state">
@@ -405,9 +420,14 @@ export function ExtrasApp(props: Props) {
         <div className="extras-detail">
           <div>
             <ServiceArt service={service} />
+            {service.images && service.images.length > 1 && (
+              <div className="extras-photo-secondary">
+                <ServiceArt service={service} photo={1} />
+              </div>
+            )}
             <div className="extras-detail-copy">
               <p>{service.description}</p>
-              <h2>Что входит</h2>
+              {service.includes.length > 0 && <h2>Что входит</h2>}
               <ul>
                 {service.includes.map((text) => (
                   <li key={text}>
@@ -423,142 +443,237 @@ export function ExtrasApp(props: Props) {
               </Alert>
             </div>
           </div>
-          <form
-            className="extras-panel extras-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void addToCart();
-            }}
-          >
-            <div className="extras-base-price">
-              <strong>{money(service.price)}</strong>
-              <span>{service.unit}</span>
+          {blockedService ? (
+            <div className="extras-panel">
+              <h2>
+                {service.price === null
+                  ? "Стоимость уточняется"
+                  : "Услуга недоступна"}
+              </h2>
+              <p>{blockedService}</p>
             </div>
-            <label htmlFor="extra-date">
-              {service.id === "late-checkout" ? "День выезда" : "Дата"}
-            </label>
-            <select
-              id="extra-date"
-              required
-              value={draft.date}
-              disabled={busy || service.id === "late-checkout"}
-              onChange={(event) =>
-                updateDraft({ date: event.target.value, time: "" })
-              }
+          ) : (
+            <form
+              className="extras-panel extras-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void addToCart();
+              }}
             >
-              <option value="">Выберите дату</option>
-              {stayDates(stay).map((date) => {
-                const reason = dateReason(service, date, stay, catalog, now);
-                const noTimes = !service.times.some(
-                  (time) =>
-                    !timeReason(service, date, time, stay, catalog, now),
-                );
-                return (
-                  <option
-                    key={date}
-                    value={date}
-                    disabled={Boolean(reason) || noTimes}
+              <div className="extras-base-price">
+                <strong>
+                  {service.price === 0
+                    ? "Бесплатно"
+                    : money(pricedItem(draft, catalog).unitPrice)}
+                </strong>
+                <span>{service.unit}</span>
+              </div>
+              {service.durations && (
+                <>
+                  <label htmlFor="extra-duration">Длительность</label>
+                  <select
+                    id="extra-duration"
+                    value={draft.durationDays ?? 1}
+                    disabled={busy}
+                    onChange={(event) =>
+                      updateDraft({
+                        durationDays: Number(event.target.value) as 1 | 2,
+                      })
+                    }
                   >
-                    {shortDate(date)}
-                    {reason
-                      ? ` — ${reason}`
-                      : noTimes
-                        ? " — нет времени в пределах проживания"
-                        : ""}
-                  </option>
-                );
-              })}
-            </select>
-            {service.id === "late-checkout" && (
-              <p className="extras-note">
-                Стандартный выезд — в {stay.checkOutTime}. Запросите более
-                позднее время.
-              </p>
-            )}
-            <label htmlFor="extra-time">
-              {service.id === "breakfast"
-                ? "Интервал доставки"
-                : service.id === "furako"
-                  ? "Желаемое время готовности"
-                  : "Желаемое время выезда"}
-            </label>
-            <select
-              id="extra-time"
-              required
-              value={draft.time}
-              disabled={busy || !draft.date}
-              onChange={(event) => updateDraft({ time: event.target.value })}
-            >
-              <option value="">Выберите время</option>
-              {service.times.map((time) => {
-                const reason = timeReason(
-                  service,
-                  draft.date,
-                  time,
-                  stay,
-                  catalog,
-                  now,
-                );
-                return (
-                  <option key={time} value={time} disabled={Boolean(reason)}>
-                    {time}
-                    {reason && draft.date ? ` — ${reason}` : ""}
-                  </option>
-                );
-              })}
-            </select>
-            <p className="extras-note">Время объекта — московское.</p>
-            {service.id === "breakfast" && (
-              <>
-                <label htmlFor="extra-quantity">
-                  Количество наборов на двоих
-                </label>
-                <select
-                  id="extra-quantity"
-                  value={draft.quantity}
-                  disabled={busy}
-                  onChange={(event) =>
-                    updateDraft({ quantity: Number(event.target.value) })
-                  }
-                >
-                  {Array.from({ length: catalog.rules.maxSets }, (_, n) => (
-                    <option key={n + 1} value={n + 1}>
-                      {n + 1} {n === 0 ? "набор" : n < 4 ? "набора" : "наборов"}
-                    </option>
-                  ))}
-                </select>
-              </>
-            )}
-            {service.addon && (
-              <label className="extras-addon">
-                <input
-                  type="checkbox"
-                  checked={draft.decoration}
-                  disabled={busy}
-                  onChange={(event) =>
-                    updateDraft({ decoration: event.target.checked })
-                  }
-                />
-                <span>
-                  {service.addon.name}
-                  <small>+{money(service.addon.price)}</small>
-                </span>
+                    {service.durations.map((d) => (
+                      <option key={d.days} value={d.days}>
+                        {d.days === 1 ? "1 день" : "2 дня"} · {money(d.price)}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="extras-note">
+                    Для двух дней оба дня купания должны быть до дня выезда.
+                  </p>
+                </>
+              )}
+              <label htmlFor="extra-date">
+                {service.id === "late-checkout" ? "День выезда" : "Дата"}
               </label>
-            )}
-            {formReason && (
-              <p className="extras-note" role="status">
-                {formReason}
-              </p>
-            )}
-            <Button
-              type="submit"
-              disabled={busy || !data?.writable || Boolean(formReason)}
-            >
-              {busy
-                ? "Сохраняем…"
-                : `${editId ? "Сохранить изменения" : "Добавить в корзину"} · ${money(cartTotal([pricedItem(draft, catalog)]))}`}
-            </Button>
-          </form>
+              <select
+                id="extra-date"
+                required
+                value={draft.date}
+                disabled={busy || service.id === "late-checkout"}
+                onChange={(event) =>
+                  updateDraft({
+                    date: event.target.value,
+                    time:
+                      service.timing === "agreement" ? "По согласованию" : "",
+                  })
+                }
+              >
+                <option value="">Выберите дату</option>
+                {stayDates(stay).map((date) => {
+                  const reason = dateReason(service, date, stay, catalog, now);
+                  const noTimes = !service.times.some(
+                    (time) =>
+                      !timeReason(service, date, time, stay, catalog, now),
+                  );
+                  return (
+                    <option
+                      key={date}
+                      value={date}
+                      disabled={Boolean(reason) || noTimes}
+                    >
+                      {shortDate(date)}
+                      {reason
+                        ? ` — ${reason}`
+                        : noTimes
+                          ? " — нет времени в пределах проживания"
+                          : ""}
+                    </option>
+                  );
+                })}
+              </select>
+              {service.id === "late-checkout" && (
+                <p className="extras-note">
+                  Стандартный выезд — в {stay.checkOutTime}. Запросите более
+                  позднее время.
+                </p>
+              )}
+              {service.timing === "agreement" ? (
+                <p className="extras-note">
+                  Время и длительность — по согласованию.
+                </p>
+              ) : (
+                <>
+                  <label htmlFor="extra-time">
+                    {service.id === "breakfast"
+                      ? "Интервал доставки"
+                      : service.id === "furako"
+                        ? "Желаемое время готовности"
+                        : "Желаемое время выезда"}
+                  </label>
+                  <select
+                    id="extra-time"
+                    required
+                    value={draft.time}
+                    disabled={busy || !draft.date}
+                    onChange={(event) =>
+                      updateDraft({ time: event.target.value })
+                    }
+                  >
+                    <option value="">Выберите время</option>
+                    {service.times.map((time) => {
+                      const reason = timeReason(
+                        service,
+                        draft.date,
+                        time,
+                        stay,
+                        catalog,
+                        now,
+                      );
+                      return (
+                        <option
+                          key={time}
+                          value={time}
+                          disabled={Boolean(reason)}
+                        >
+                          {time}
+                          {reason && draft.date ? ` — ${reason}` : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <p className="extras-note">Время объекта — московское.</p>
+                </>
+              )}
+              {service.quantityLabel && (
+                <>
+                  <label htmlFor="extra-quantity">
+                    {service.quantityLabel}
+                  </label>
+                  <select
+                    id="extra-quantity"
+                    value={draft.quantity}
+                    disabled={busy}
+                    onChange={(event) =>
+                      updateDraft({ quantity: Number(event.target.value) })
+                    }
+                  >
+                    {Array.from({ length: catalog.rules.maxSets }, (_, n) => (
+                      <option key={n + 1} value={n + 1}>
+                        {n + 1}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
+              {service.addon && (
+                <label className="extras-addon">
+                  <input
+                    type="checkbox"
+                    checked={draft.decoration}
+                    disabled={busy}
+                    onChange={(event) =>
+                      updateDraft({ decoration: event.target.checked })
+                    }
+                  />
+                  <span>
+                    {service.addon.name}
+                    <small>+{money(service.addon.price)}</small>
+                  </span>
+                </label>
+              )}
+              {service.firAddon && (
+                <label className="extras-addon">
+                  <input
+                    type="checkbox"
+                    checked={draft.fir ?? false}
+                    disabled={busy}
+                    onChange={(event) =>
+                      updateDraft({ fir: event.target.checked })
+                    }
+                  />
+                  <span>
+                    {service.firAddon.name}
+                    <small>+{money(service.firAddon.price)}</small>
+                  </span>
+                </label>
+              )}
+              {service.robeAddon && (
+                <>
+                  <label htmlFor="extra-robes">
+                    Халаты · {money(service.robeAddon.price)} за штуку
+                  </label>
+                  <select
+                    id="extra-robes"
+                    disabled={busy}
+                    value={draft.robes ?? 0}
+                    onChange={(event) =>
+                      updateDraft({ robes: Number(event.target.value) })
+                    }
+                  >
+                    <option value="0">Без халатов</option>
+                    {Array.from({ length: catalog.rules.maxSets }, (_, n) => (
+                      <option key={n + 1} value={n + 1}>
+                        {n + 1}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
+              {formReason && (
+                <p className="extras-note" role="status">
+                  {formReason}
+                </p>
+              )}
+              <Button
+                type="submit"
+                disabled={busy || !data?.writable || Boolean(formReason)}
+              >
+                {busy
+                  ? "Сохраняем…"
+                  : `${editId ? "Сохранить изменения" : "Добавить в корзину"} · ${money(cartTotal([pricedItem(draft, catalog)]))}`}
+              </Button>
+            </form>
+          )}
         </div>
       )}
 
@@ -582,8 +697,8 @@ export function ExtrasApp(props: Props) {
                     {serviceFor(catalog, item.serviceId).confirmation ===
                       "manual" && (
                       <p className="extras-pending">
-                        Время требует согласования. После оплаты менеджер
-                        свяжется с вами.
+                        Время и наличие требуют согласования. После оформления
+                        менеджер свяжется с вами.
                       </p>
                     )}
                     {cartIssues.find((i) => i.id === item.id)?.reason && (
@@ -701,15 +816,19 @@ export function ExtrasApp(props: Props) {
                         version: cart.version,
                         total,
                       })
-                    )
-                      go("payment");
+                    ) {
+                      if (total === 0) await pay();
+                      else go("payment");
+                    }
                   }}
                 >
                   {busy
                     ? "Проверяем…"
                     : view === "cart"
                       ? "К оформлению"
-                      : "Перейти к демооплате"}
+                      : total === 0
+                        ? "Оформить бесплатно"
+                        : "Перейти к демооплате"}
                 </Button>
               </div>
             </div>
@@ -785,7 +904,9 @@ export function ExtrasApp(props: Props) {
                 <div>
                   <h2>{order.number}</h2>
                   <p>
-                    Оплата в демонстрационном режиме прошла. Заказ сохранён.
+                    {order.total === 0
+                      ? "Бесплатная заявка сохранена. Наличие и время требуют согласования."
+                      : "Оплата в демонстрационном режиме прошла. Заказ сохранён."}
                   </p>
                 </div>
               </div>

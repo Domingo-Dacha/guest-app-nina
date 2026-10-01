@@ -1,4 +1,5 @@
 import { Bath, Coffee, Sunset, Check, Clock3 } from "lucide-react";
+import Image from "next/image";
 import type {
   CartItem,
   ExtraOrder,
@@ -15,11 +16,29 @@ import {
   shortDate,
 } from "@/lib/extras-rules";
 
-export function ServiceArt({ service }: { service: ExtraService }) {
+export function ServiceArt({
+  service,
+  photo = 0,
+}: {
+  service: ExtraService;
+  photo?: number;
+}) {
+  const picture = service.images?.[photo];
+  if (picture)
+    return (
+      <div className="extras-photo">
+        <Image
+          src={picture.src}
+          alt={picture.alt}
+          fill
+          sizes="(max-width: 680px) 100vw, 500px"
+        />
+      </div>
+    );
   const Icon =
-    service.id === "furako"
+    service.category === "bath"
       ? Bath
-      : service.id === "breakfast"
+      : service.category === "food"
         ? Coffee
         : Sunset;
   return (
@@ -47,6 +66,9 @@ export function ItemSummary({
         <strong>{money(lineTotal(item))}</strong>
       </div>
       <p>
+        {item.serviceId === "furako" && (
+          <>{(item.durationDays ?? 1) === 2 ? "2 дня" : "1 день"} · </>
+        )}
         {shortDate(item.date)} ·{" "}
         {confirmed
           ? "Подтверждённое время"
@@ -58,12 +80,21 @@ export function ItemSummary({
       <p>
         {item.serviceId === "breakfast"
           ? `${item.quantity} наб. × ${money(item.unitPrice)}`
-          : money(item.unitPrice)}
+          : item.quantity > 1
+            ? `${item.quantity} шт. × ${money(item.unitPrice)}`
+            : money(item.unitPrice)}
         {item.decoration && (
           <>
             {" "}
             · {"addonName" in item ? item.addonName : service.addon?.name}: +
             {money(item.addonPrice)}
+          </>
+        )}
+        {item.fir && <> · Сибирская пихта: +{money(item.firPrice ?? 0)}</>}
+        {Boolean(item.robes) && (
+          <>
+            {" "}
+            · Халат: {item.robes} шт. × {money(item.robePrice ?? 0)}
           </>
         )}
       </p>
@@ -114,14 +145,16 @@ export function OrderDetails({
               ) : (
                 <Check size={18} aria-hidden="true" />
               )}
-              {paymentLabels[order.paymentStatus]} ·{" "}
-              {fulfillmentLabels[item.fulfillmentStatus]}
+              {lineTotal(item) === 0
+                ? "Без оплаты"
+                : paymentLabels[order.paymentStatus]}{" "}
+              · {fulfillmentLabels[item.fulfillmentStatus]}
             </p>
             {item.fulfillmentStatus === "awaiting_approval" && (
               <p>
-                Время требует согласования. После оплаты менеджер свяжется с
-                вами. В демонстрационном режиме статус остаётся на согласовании,
-                реальные сообщения не отправляются.
+                Время и наличие требуют согласования. В демонстрационном режиме
+                статус остаётся на согласовании, реальные сообщения не
+                отправляются.
               </p>
             )}
           </article>

@@ -86,14 +86,14 @@ async function setup(page: Page, context: BrowserContext) {
             id: randomUUID(),
             number: "DG-TEST0001",
             createdAt: state.serverNow,
-            paymentStatus: "paid",
+            paymentStatus: command.total === 0 ? "not_required" : "paid",
             total: cartTotal(state.cart.items),
             comment: command.comment,
             stay: structuredClone(state.stay),
             items: state.cart.items.map((i) => ({
               ...i,
               name: serviceFor(state.catalog, i.serviceId).name,
-              addonName: i.decoration ? "Украшение фурако" : null,
+              addonName: i.decoration ? "Украшение в бочку" : null,
               fulfillmentStatus:
                 i.serviceId === "breakfast" ? "confirmed" : "awaiting_approval",
               confirmedTime: i.serviceId === "breakfast" ? i.time : null,
@@ -139,9 +139,16 @@ test("full extras journey keeps drafts, edits the cart, handles failed/cancelled
   await expect(
     page.getByRole("button", { name: "Выбрать: Фурако", exact: true }),
   ).toBeVisible();
+  await expect
+    .poll(() =>
+      page
+        .getByAltText("Фурако на деревянной террасе среди деревьев")
+        .evaluate((image) => (image as HTMLImageElement).naturalWidth),
+    )
+    .toBeGreaterThan(0);
   await page.screenshot({
     path: testInfo.outputPath("catalog.png"),
-    fullPage: true,
+    fullPage: false,
   });
   await page
     .getByRole("button", { name: "Баня и фурако", exact: true })
@@ -161,9 +168,9 @@ test("full extras journey keeps drafts, edits the cart, handles failed/cancelled
   await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
   await page.getByLabel("Желаемое время готовности").selectOption("19:00");
   await expect(
-    page.getByRole("checkbox", { name: /Украшение фурако/ }),
+    page.getByRole("checkbox", { name: /Украшение в бочку/ }),
   ).not.toBeChecked();
-  await page.getByRole("checkbox", { name: /Украшение фурако/ }).check();
+  await page.getByRole("checkbox", { name: /Украшение в бочку/ }).check();
   await page.screenshot({
     path: testInfo.outputPath("service.png"),
     fullPage: true,
@@ -179,7 +186,7 @@ test("full extras journey keeps drafts, edits the cart, handles failed/cancelled
     "19:00",
   );
   await expect(
-    page.getByRole("checkbox", { name: /Украшение фурако/ }),
+    page.getByRole("checkbox", { name: /Украшение в бочку/ }),
   ).toBeChecked();
   await page.getByRole("button", { name: /Добавить в корзину/ }).click();
   await page.getByRole("button", { name: "Все", exact: true }).click();
@@ -238,7 +245,7 @@ test("full extras journey keeps drafts, edits the cart, handles failed/cancelled
     page.getByText("Оплачено · Подтверждено", { exact: true }),
   ).toBeVisible();
   expect(harness.checkoutCalls()).toBe(1);
-  expect(harness.state.orders[0].total).toBe(990000);
+  expect(harness.state.orders[0].total).toBe(1090000);
   expect(harness.state.cart.items).toHaveLength(0);
   await page.screenshot({
     path: testInfo.outputPath("result.png"),
@@ -263,6 +270,133 @@ test("full extras journey keeps drafts, edits the cart, handles failed/cancelled
     content: document.documentElement.scrollWidth,
   }));
   expect(sizes.content).toBeLessThanOrEqual(sizes.viewport);
+});
+test("expanded catalog shows unknown prices, photos and Meridian-only sauna", async ({
+  page,
+  context,
+}) => {
+  const { state } = await setup(page, context);
+  await page.goto("/extras");
+  await page.getByRole("button", { name: "Еда", exact: true }).click();
+  for (const name of ["Фермерская корзина", "Завтрак на двоих", "Обед", "Ужин"])
+    await expect(
+      page.getByRole("heading", { name, exact: true }),
+    ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Выбрать: Обед", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Стоимость уточняется" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toHaveCount(0);
+  await page.goto("/extras?view=service&service=bath-paradise");
+  await expect(
+    page.getByText("Эта услуга доступна только для гостей «Меридиана»."),
+  ).toBeVisible();
+  await page.goto("/extras?category=bath");
+  await expect(
+    page.getByRole("heading", { name: "Баня «Венский»" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Баня «Гавшино»" }),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Райская баня" })).toHaveCount(
+    0,
+  );
+  await expect
+    .poll(() =>
+      page
+        .getByAltText("Интерьер парной с панорамным окном — общее фото бань")
+        .first()
+        .evaluate((image) => (image as HTMLImageElement).naturalWidth),
+    )
+    .toBeGreaterThan(0);
+  state.stay.houseName = "Меридиан";
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Райская баня" }),
+  ).toBeVisible();
+});
+test("furako duration and optional extras survive cart editing and order reload", async ({
+  page,
+  context,
+}, testInfo) => {
+  const { state } = await setup(page, context);
+  await page.goto("/extras?view=service&service=furako");
+  await expect(
+    page.getByRole("checkbox", { name: /Сибирская пихта/ }),
+  ).not.toBeChecked();
+  await expect(page.getByLabel(/Халаты/)).toHaveValue("0");
+  await page.getByLabel("Длительность", { exact: true }).selectOption("2");
+  await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-16");
+  await page.getByLabel("Желаемое время готовности").selectOption("19:00");
+  await page.getByRole("checkbox", { name: /Украшение в бочку/ }).check();
+  await page.getByRole("checkbox", { name: /Сибирская пихта/ }).check();
+  await page.getByLabel(/Халаты/).selectOption("2");
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toContainText(/13\s*000/);
+  await page.screenshot({
+    path: testInfo.outputPath("furako-options.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: /Добавить в корзину/ }).click();
+  await page.getByRole("button", { name: /^Корзина ·/ }).click();
+  await page.getByRole("button", { name: "Изменить", exact: true }).click();
+  await expect(page.getByLabel("Длительность", { exact: true })).toHaveValue(
+    "2",
+  );
+  await expect(
+    page.getByRole("checkbox", { name: /Сибирская пихта/ }),
+  ).toBeChecked();
+  await expect(page.getByLabel(/Халаты/)).toHaveValue("2");
+  await page.getByRole("button", { name: /Сохранить изменения/ }).click();
+  await page.getByRole("button", { name: "К оформлению", exact: true }).click();
+  await page.getByRole("button", { name: "Перейти к демооплате" }).click();
+  await page.getByRole("button", { name: "Успешная демооплата" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Спасибо, заказ сохранён" }),
+  ).toBeVisible();
+  expect(state.orders[0].total).toBe(1300000);
+  await page.reload();
+  await expect(page.locator(".extras-item-summary")).toContainText(
+    "Сибирская пихта",
+  );
+  await expect(page.locator(".extras-item-summary")).toContainText("Халат: 2");
+  await expect(page.locator(".extras-item-summary")).toContainText("2 дня");
+});
+test("bicycles can be ordered free without going to payment", async ({
+  page,
+  context,
+}, testInfo) => {
+  const { state } = await setup(page, context);
+  await page.goto("/extras?category=experiences");
+  await page
+    .getByRole("button", { name: "Выбрать: Велосипеды", exact: true })
+    .click();
+  await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
+  await page.getByLabel("Количество велосипедов").selectOption("2");
+  await page.getByRole("button", { name: /Добавить в корзину/ }).click();
+  await openCheckout(page);
+  await page
+    .getByRole("button", { name: "Оформить бесплатно", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Спасибо, заказ сохранён" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Без оплаты · Ожидает согласования", { exact: true }),
+  ).toBeVisible();
+  expect(state.orders[0]).toMatchObject({
+    total: 0,
+    paymentStatus: "not_required",
+  });
+  await page.screenshot({
+    path: testInfo.outputPath("free-bicycles.png"),
+    fullPage: true,
+  });
 });
 test("checkout rechecks a breakfast deadline that elapsed while the cart was open", async ({
   page,
