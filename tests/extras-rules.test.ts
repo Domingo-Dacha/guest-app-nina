@@ -63,7 +63,7 @@ describe("extras booking rules", () => {
   it("blocks unpriced services and Meridian-only access even with forged selections", () => {
     expect(
       validateSelection(
-        { ...selection, serviceId: "burger" },
+        { ...selection, serviceId: "dinner" },
         stay,
         catalog,
         before,
