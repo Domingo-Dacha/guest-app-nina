@@ -116,7 +116,7 @@ async function setup(page: Page, context: BrowserContext) {
 }
 async function breakfast(page: Page) {
   await page
-    .getByRole("button", { name: "Выбрать: Завтрак на двоих", exact: true })
+    .getByRole("button", { name: "Выбрать: Завтрак", exact: true })
     .click();
   await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
   await page.getByLabel("Интервал доставки").selectOption("09:00–09:30");
@@ -139,8 +139,11 @@ test("full extras journey keeps drafts, edits the cart, handles failed/cancelled
   await page.goto("/");
   await page.getByRole("link", { name: "Допуслуги", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Выбрать: Фурако", exact: true }),
+    page.getByRole("button", { name: "Выбрать: Бочка фурако", exact: true }),
   ).toBeVisible();
+  await page
+    .getByAltText("Фурако на деревянной террасе среди деревьев")
+    .scrollIntoViewIfNeeded();
   await expect
     .poll(() =>
       page
@@ -157,12 +160,12 @@ test("full extras journey keeps drafts, edits the cart, handles failed/cancelled
     .click();
   await expect(
     page.getByRole("button", {
-      name: "Выбрать: Завтрак на двоих",
+      name: "Выбрать: Завтрак",
       exact: true,
     }),
   ).toHaveCount(0);
   await page
-    .getByRole("button", { name: "Выбрать: Фурако", exact: true })
+    .getByRole("button", { name: "Выбрать: Бочка фурако", exact: true })
     .click();
   await expect(
     page.getByRole("button", { name: /Добавить в корзину/ }),
@@ -182,7 +185,7 @@ test("full extras journey keeps drafts, edits the cart, handles failed/cancelled
     page.getByRole("button", { name: "Баня и фурако", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await page
-    .getByRole("button", { name: "Выбрать: Фурако", exact: true })
+    .getByRole("button", { name: "Выбрать: Бочка фурако", exact: true })
     .click();
   await expect(page.getByLabel("Желаемое время готовности")).toHaveValue(
     "19:00",
@@ -195,7 +198,7 @@ test("full extras journey keeps drafts, edits the cart, handles failed/cancelled
   await breakfast(page);
   await page.getByRole("button", { name: /^Корзина ·/ }).click();
   const breakfastCard = page.locator("article").filter({
-    has: page.getByRole("heading", { name: "Завтрак на двоих", exact: true }),
+    has: page.getByRole("heading", { name: "Завтрак", exact: true }),
   });
   await breakfastCard
     .getByRole("button", { name: "Изменить", exact: true })
@@ -280,7 +283,7 @@ test("expanded catalog shows unknown prices, photos and Meridian-only sauna", as
   const { state } = await setup(page, context);
   await page.goto("/extras");
   await page.getByRole("button", { name: "Еда", exact: true }).click();
-  for (const name of ["Фермерская корзина", "Завтрак на двоих", "Обед", "Ужин"])
+  for (const name of ["Фермерская корзина", "Завтрак", "Обед", "Ужин"])
     await expect(
       page.getByRole("heading", { name, exact: true }),
     ).toBeVisible();
@@ -519,7 +522,7 @@ test("basket opens a Telegram draft with the stay house and bicycles are retired
   ).toHaveCount(0);
   await page.goto("/extras?view=service&service=bicycles");
   await expect(
-    page.getByText("Эта услуга больше не доступна в разделе «Допуслуги»."),
+    page.getByRole("heading", { name: "Услуга недоступна", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: /Добавить в корзину/ }),
@@ -619,4 +622,129 @@ test("a price change must be accepted before payment", async ({
     page.getByRole("heading", { name: "Спасибо, заказ сохранён" }),
   ).toBeVisible();
   expect(state.orders[0].total).toBe(210000);
+});
+
+test("guest copy, service order and empty-category links stay consistent", async ({
+  page,
+  context,
+}, testInfo) => {
+  test.setTimeout(60_000);
+  const { state } = await setup(page, context);
+  const copy = [
+    [
+      "breakfast",
+      "Завтрак",
+      "Начните утро вкусно и без спешки. Завтрак с доставкой прямо на вашу дачу.",
+    ],
+    [
+      "lunch",
+      "Обед",
+      "Вкусный обед без готовки и лишних хлопот. Мы приготовим его и доставим к вашему домику.",
+    ],
+    [
+      "dinner",
+      "Ужин",
+      "Завершите день вкусным ужином, не отвлекаясь от отдыха.",
+    ],
+    [
+      "farm-basket",
+      "Фермерская корзина",
+      "Возьмите фермерские натуральные продукты на пикник или заберите домой, чтобы приготовить что-нибудь вкусное.",
+    ],
+    [
+      "sup",
+      "Сапы",
+      "В теплое время года мы организуем сплавы на сапах по реке Нара.",
+    ],
+    [
+      "late-checkout",
+      "Поздний выезд",
+      "Продлите отдых и останьтесь в любимом домике до вечера, если он свободен после вашего проживания.",
+    ],
+  ];
+  await page.goto("/extras");
+  await expect(page.locator(".extras-service-card h2")).toHaveText([
+    "Завтрак",
+    "Обед",
+    "Ужин",
+    "Фермерская корзина",
+    "Бочка фурако",
+    "Сапы",
+    "Поздний выезд",
+    "Фурако у бани «Венский»",
+    "Баня «Венский»",
+    "Баня «Гавшино»",
+    "Баня «Венский» + фурако",
+    "Дрова",
+  ]);
+  for (const [, name, description] of copy) {
+    const card = page
+      .locator(".extras-service-card")
+      .filter({ has: page.getByRole("heading", { name, exact: true }) });
+    await expect(
+      card.locator(".extras-service-card__body > p").nth(1),
+    ).toHaveText(description);
+  }
+  await expect(
+    page.getByRole("button", { name: "Особый повод", exact: true }),
+  ).toHaveCount(0);
+  await page.screenshot({
+    path: testInfo.outputPath("updated-catalog.png"),
+    fullPage: false,
+  });
+  for (const [id, name, description] of copy) {
+    await page
+      .getByRole("button", { name: `Выбрать: ${name}`, exact: true })
+      .click();
+    await expect(page.locator(".extras-detail-copy > p")).toHaveText(
+      description,
+    );
+    const widths = await page.evaluate(() => [
+      document.documentElement.scrollWidth,
+      document.documentElement.clientWidth,
+    ]);
+    expect(widths[0]).toBeLessThanOrEqual(widths[1]);
+    if (id === "breakfast")
+      await page.screenshot({
+        path: testInfo.outputPath("updated-breakfast.png"),
+        fullPage: true,
+      });
+    await page.getByRole("button", { name: "Назад", exact: true }).click();
+  }
+  await page
+    .getByRole("button", { name: "Выбрать: Бочка фурако", exact: true })
+    .click();
+  await expect(page.locator(".extras-detail-copy")).toContainText(
+    "Попробуйте новый вид парения.",
+  );
+  await expect(page.locator(".extras-detail")).toContainText(
+    "Вы выбираете желаемое время.",
+  );
+  await expect(page.locator(".extras-detail")).not.toContainText(
+    "а не свободный слот",
+  );
+  await expect(page.locator(".extras-detail-copy")).toContainText(
+    "Время требует согласования.",
+  );
+  await page.goto("/extras?view=service&service=bicycles");
+  await expect(page.locator(".extras-detail")).toHaveCount(0);
+  await page.getByRole("button", { name: "Вернуться к услугам" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Допуслуги", exact: true }),
+  ).toBeVisible();
+  state.catalog.services.find((s) => s.id === "sup")!.retired = true;
+  await page.goto("/extras?category=experiences");
+  await expect(
+    page.getByRole("button", { name: "Впечатления", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Все", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".extras-service-card").first()).toContainText(
+    "Завтрак",
+  );
+  await page.goto("/");
+  await expect(
+    page.getByText(copy.find(([id]) => id === "sup")![2], { exact: true }),
+  ).toBeVisible();
 });

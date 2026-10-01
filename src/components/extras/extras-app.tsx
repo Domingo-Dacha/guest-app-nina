@@ -49,7 +49,7 @@ export function ExtrasApp(props: Props) {
   const router = useRouter(),
     search = useSearchParams();
   const view = search.get("view") ?? "catalog",
-    category = search.get("category") ?? "all";
+    requestedCategory = search.get("category") ?? "all";
   const [data, setData] = useState<ExtrasSnapshot | null>(null);
   const [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false);
@@ -68,7 +68,9 @@ export function ExtrasApp(props: Props) {
     stay = data?.stay ?? props.stay;
   const cart = data?.cart ?? { version: 0, items: [] },
     total = cartTotal(cart.items);
-  const service = catalog.services.find((s) => s.id === search.get("service"));
+  const service = catalog.services.find(
+    (s) => s.id === search.get("service") && !s.retired,
+  );
   const editId = search.get("edit"),
     draftKey = editId ?? service?.id ?? "";
   const existing = cart.items.find((item) => item.id === editId);
@@ -93,6 +95,9 @@ export function ExtrasApp(props: Props) {
   const visibleServices = catalog.services.filter(
     (s) => !s.retired && availableForStay(s, stay),
   );
+  const category = visibleServices.some((s) => s.category === requestedCategory)
+    ? requestedCategory
+    : "all";
   const stalePrices = pricesChanged(cart.items, catalog);
   const cartIssues = cart.items
     .map((item) => ({
@@ -708,8 +713,8 @@ export function ExtrasApp(props: Props) {
                   <p className="extras-note">Время объекта — московское.</p>
                   {service.category === "bath" && (
                     <p className="extras-note">
-                      Вы выбираете желаемое время, а не свободный слот.
-                      Посещение требует подтверждения.
+                      Вы выбираете желаемое время. Посещение требует
+                      подтверждения.
                     </p>
                   )}
                 </>
