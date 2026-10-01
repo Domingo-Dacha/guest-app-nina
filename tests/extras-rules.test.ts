@@ -147,25 +147,36 @@ describe("extras booking rules", () => {
       ),
     ).toContain("Меридиана");
   });
-  it("allows zero-cost bicycles with agreement and rejects a past departure", () => {
+  it("blocks retired bicycles and external basket checkout while retaining historical prices", () => {
     const bikes: Selection = {
       ...selection,
       serviceId: "bicycles",
       time: "По согласованию",
       quantity: 2,
     };
-    expect(validateSelection(bikes, stay, catalog, before)).toBeNull();
+    expect(validateSelection(bikes, stay, catalog, before)).toContain(
+      "больше не доступна",
+    );
     expect(() =>
       validateCheckout([pricedItem(bikes, catalog)], stay, catalog, 0, before),
-    ).not.toThrow();
+    ).toThrow("больше не доступна");
     expect(
       validateSelection(
-        { ...bikes, date: stay.checkOut },
+        { ...bikes, serviceId: "sup", date: stay.checkOut },
         stay,
         catalog,
         new Date("2026-10-18T09:00:00Z"),
       ),
     ).toContain("завершилось");
+    expect(cartTotal([pricedItem(bikes, catalog)])).toBe(0);
+    expect(
+      validateSelection(
+        { ...bikes, serviceId: "farm-basket" },
+        stay,
+        catalog,
+        before,
+      ),
+    ).toContain("Telegram");
     expect(
       cartTotal([pricedItem({ ...bikes, serviceId: "sup" }, catalog)]),
     ).toBe(400000);

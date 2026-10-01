@@ -200,7 +200,9 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
       robePrice: 50000,
     });
   });
-  it("saves a free bicycle order without marking it paid", async () => {
+  it("keeps historical free bicycle orders readable after retiring the service", async () => {
+    const legacyCatalog = structuredClone(catalog);
+    legacyCatalog.services.find((s) => s.id === "bicycles")!.retired = false;
     await repo("free").execute(
       {
         action: "save",
@@ -215,7 +217,7 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
         },
       },
       stay,
-      catalog,
+      legacyCatalog,
       now,
     );
     const command = {
@@ -225,10 +227,13 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
       comment: "",
       total: 0,
     };
-    const order = await repo("free").execute(command, stay, catalog, now);
+    const order = await repo("free").execute(command, stay, legacyCatalog, now);
     expect(order).toMatchObject({ total: 0, paymentStatus: "not_required" });
     expect(order?.items[0].fulfillmentStatus).toBe("awaiting_approval");
     expect((await repo("free").getCart(stay)).items).toHaveLength(0);
+    expect((await repo("free").listOrders(stay))[0].items[0].name).toBe(
+      "Велосипеды",
+    );
     expect((await repo("free").execute(command, stay, catalog, now))?.id).toBe(
       order?.id,
     );

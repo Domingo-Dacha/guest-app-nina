@@ -62,6 +62,9 @@ export function availableForStay(service: ExtraService, stay: StayContext) {
   );
 }
 export function serviceBlockReason(service: ExtraService, stay: StayContext) {
+  if (service.retired)
+    return "Эта услуга больше не доступна в разделе «Допуслуги».";
+  if (service.telegramOrder) return "Заказ оформляется у Марго в Telegram.";
   if (!availableForStay(service, stay))
     return "Эта услуга доступна только для гостей «Меридиана».";
   if (service.price === null)

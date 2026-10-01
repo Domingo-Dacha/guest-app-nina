@@ -47,8 +47,14 @@ export type ExtraService = {
   unit: string;
   confirmation: "automatic" | "manual";
   times: string[];
+  retired?: boolean;
+  telegramOrder?: { username: string };
   addon?: { name: string; price: number };
-  firAddon?: { name: string; price: number };
+  firAddon?: {
+    name: string;
+    price: number;
+    image?: { src: string; alt: string };
+  };
   robeAddon?: {
     name: string;
     price: number;

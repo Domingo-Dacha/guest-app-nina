@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
+import { farmBasketLink, farmBasketMessage } from "@/lib/farm-basket-order";
 import type {
   ExtraOrder,
   ExtrasCatalog,
@@ -88,8 +89,8 @@ export function ExtrasApp(props: Props) {
     ? validateSelection(draft, stay, catalog, now)
     : null;
   const blockedService = service ? serviceBlockReason(service, stay) : null;
-  const visibleServices = catalog.services.filter((s) =>
-    availableForStay(s, stay),
+  const visibleServices = catalog.services.filter(
+    (s) => !s.retired && availableForStay(s, stay),
   );
   const stalePrices = pricesChanged(cart.items, catalog);
   const cartIssues = cart.items
@@ -379,21 +380,25 @@ export function ExtrasApp(props: Props) {
                     <h2>{s.name}</h2>
                     <p>{s.summary}</p>
                     <p className="extras-note">
-                      {s.confirmation === "manual"
-                        ? "Время по согласованию"
-                        : "Заказ до 18:00 накануне"}
+                      {s.telegramOrder
+                        ? "Доставка от фермы «МАРГО»"
+                        : s.confirmation === "manual"
+                          ? "Время по согласованию"
+                          : "Заказ до 18:00 накануне"}
                     </p>
                     <div className="extras-card-action">
-                      <div>
-                        <strong>
-                          {s.price === null
-                            ? "Стоимость уточняется"
-                            : s.price === 0
-                              ? "Бесплатно"
-                              : money(s.price)}
-                        </strong>
-                        <span>{s.unit}</span>
-                      </div>
+                      {!s.telegramOrder && (
+                        <div>
+                          <strong>
+                            {s.price === null
+                              ? "Стоимость уточняется"
+                              : s.price === 0
+                                ? "Бесплатно"
+                                : money(s.price)}
+                          </strong>
+                          <span>{s.unit}</span>
+                        </div>
+                      )}
                       <Button
                         aria-label={`Выбрать: ${s.name}`}
                         onClick={() => go("service", { service: s.id })}
@@ -450,8 +455,30 @@ export function ExtrasApp(props: Props) {
               </Alert>
             </div>
           </div>
-          {blockedService &&
-          !(service.category === "bath" && availableForStay(service, stay)) ? (
+          {service.telegramOrder ? (
+            <div className="extras-panel extras-form">
+              <h2>Заказ у фермы «МАРГО»</h2>
+              <p>
+                Откроется чат с Марго. Название дома уже добавлено в сообщение:
+              </p>
+              <p className="extras-comment">{farmBasketMessage(stay)}</p>
+              <a
+                className="button button--primary"
+                href={farmBasketLink(service.telegramOrder.username, stay)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Заказать
+              </a>
+              <p className="extras-note">
+                Отправьте сообщение в Telegram. Марго подтвердит стоимость и
+                доставку в переписке.
+              </p>
+            </div>
+          ) : blockedService &&
+            !(
+              service.category === "bath" && availableForStay(service, stay)
+            ) ? (
             <div className="extras-panel">
               <h2>
                 {service.price === null
@@ -704,20 +731,25 @@ export function ExtrasApp(props: Props) {
                 </label>
               )}
               {service.firAddon && (
-                <label className="extras-addon">
-                  <input
-                    type="checkbox"
-                    checked={draft.fir ?? false}
-                    disabled={busy}
-                    onChange={(event) =>
-                      updateDraft({ fir: event.target.checked })
-                    }
-                  />
-                  <span>
-                    {service.firAddon.name}
-                    <small>+{money(service.firAddon.price)}</small>
-                  </span>
-                </label>
+                <>
+                  {service.firAddon.image && (
+                    <ServicePhoto picture={service.firAddon.image} />
+                  )}
+                  <label className="extras-addon">
+                    <input
+                      type="checkbox"
+                      checked={draft.fir ?? false}
+                      disabled={busy}
+                      onChange={(event) =>
+                        updateDraft({ fir: event.target.checked })
+                      }
+                    />
+                    <span>
+                      {service.firAddon.name}
+                      <small>+{money(service.firAddon.price)}</small>
+                    </span>
+                  </label>
+                </>
               )}
               {service.robeAddon && (
                 <>

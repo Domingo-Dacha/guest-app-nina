@@ -457,36 +457,77 @@ test("furako duration and optional extras survive cart editing and order reload"
   await expect(page.locator(".extras-item-summary")).toContainText("Халат: 2");
   await expect(page.locator(".extras-item-summary")).toContainText("2 дня");
 });
-test("bicycles can be ordered free without going to payment", async ({
+test("basket opens a Telegram draft with the stay house and bicycles are retired", async ({
   page,
   context,
 }, testInfo) => {
   const { state } = await setup(page, context);
-  await page.goto("/extras?category=experiences");
-  await page
-    .getByRole("button", { name: "Выбрать: Велосипеды", exact: true })
-    .click();
-  await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
-  await page.getByLabel("Количество велосипедов").selectOption("2");
-  await page.getByRole("button", { name: /Добавить в корзину/ }).click();
-  await openCheckout(page);
-  await page
-    .getByRole("button", { name: "Оформить бесплатно", exact: true })
-    .click();
+  state.stay.houseName = "Меридиан & Лес";
+  await page.goto("/extras");
   await expect(
-    page.getByRole("heading", { name: "Спасибо, заказ сохранён" }),
+    page.getByRole("heading", { name: "Велосипеды", exact: true }),
+  ).toHaveCount(0);
+  await page.goto("/extras?view=service&service=bicycles");
+  await expect(
+    page.getByText("Эта услуга больше не доступна в разделе «Допуслуги»."),
   ).toBeVisible();
   await expect(
-    page.getByText("Без оплаты · Ожидает согласования", { exact: true }),
-  ).toBeVisible();
-  expect(state.orders[0]).toMatchObject({
-    total: 0,
-    paymentStatus: "not_required",
-  });
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toHaveCount(0);
+  await page.goto("/extras?category=food");
+  const card = page
+    .locator("article")
+    .filter({
+      has: page.getByRole("heading", {
+        name: "Фермерская корзина",
+        exact: true,
+      }),
+    });
+  await expect(card).not.toContainText("Время по согласованию");
+  await expect(card).not.toContainText("Стоимость уточняется");
+  await page
+    .getByRole("button", { name: "Выбрать: Фермерская корзина", exact: true })
+    .click();
+  for (const item of [
+    "Молоко — 1 л",
+    "Яйца — 10 шт.",
+    "Адыгейский козий сыр",
+    "Хлеб ржаной домашний",
+    "Подарок-сюрприз",
+  ])
+    await expect(page.getByText(item, { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Дата", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toHaveCount(0);
+  const orderLink = page.getByRole("link", { name: "Заказать", exact: true });
+  const url = new URL((await orderLink.getAttribute("href"))!);
+  expect(url.origin).toBe("https://t.me");
+  expect(url.pathname).toBe("/Margosch_ka");
+  expect(url.searchParams.get("text")).toBe(
+    "Я гость Domingo Dacha — дом Меридиан & Лес\nХочу заказать фермерскую корзину",
+  );
+  expect(state.orders).toHaveLength(0);
+  expect(state.cart.items).toHaveLength(0);
   await page.screenshot({
-    path: testInfo.outputPath("free-bicycles.png"),
+    path: testInfo.outputPath("farm-basket.png"),
     fullPage: true,
   });
+  // Intercept before clicking: verify navigation without contacting the real account.
+  await context.route("https://t.me/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<p>Telegram draft preview</p>",
+    }),
+  );
+  const popupPromise = page.waitForEvent("popup");
+  await orderLink.click();
+  const popup = await popupPromise;
+  await popup.waitForLoadState();
+  expect(new URL(popup.url()).searchParams.get("text")).toBe(
+    url.searchParams.get("text"),
+  );
+  await popup.close();
 });
 test("checkout rechecks a breakfast deadline that elapsed while the cart was open", async ({
   page,
