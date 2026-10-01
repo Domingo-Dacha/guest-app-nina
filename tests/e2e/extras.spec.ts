@@ -276,16 +276,22 @@ test("full extras journey keeps drafts, edits the cart, handles failed/cancelled
 test("expanded catalog shows unknown prices, photos and Meridian-only sauna", async ({
   page,
   context,
-}) => {
+}, testInfo) => {
   const { state } = await setup(page, context);
   await page.goto("/extras");
   await page.getByRole("button", { name: "Еда", exact: true }).click();
-  for (const name of ["Фермерская корзина", "Завтрак на двоих", "Обед", "Ужин"])
+  for (const name of [
+    "Фермерская корзина",
+    "Завтрак на двоих",
+    "Обед",
+    "Бургер",
+    "Ужин",
+  ])
     await expect(
       page.getByRole("heading", { name, exact: true }),
     ).toBeVisible();
   await page
-    .getByRole("button", { name: "Выбрать: Обед", exact: true })
+    .getByRole("button", { name: "Выбрать: Бургер", exact: true })
     .click();
   await expect(
     page.getByRole("heading", { name: "Стоимость уточняется" }),
@@ -293,6 +299,19 @@ test("expanded catalog shows unknown prices, photos and Meridian-only sauna", as
   await expect(
     page.getByRole("button", { name: /Добавить в корзину/ }),
   ).toHaveCount(0);
+  const burgerPhoto = page.getByAltText(
+    "Бургер с фирменной булочкой Domingo Dacha",
+  );
+  await burgerPhoto.scrollIntoViewIfNeeded();
+  await expect
+    .poll(() =>
+      burgerPhoto.evaluate((image) => (image as HTMLImageElement).naturalWidth),
+    )
+    .toBeGreaterThan(0);
+  await page.screenshot({
+    path: testInfo.outputPath("burger.png"),
+    fullPage: true,
+  });
   await page.goto("/extras?view=service&service=bath-paradise");
   await expect(
     page.getByText("Эта услуга доступна только для гостей «Меридиана»."),

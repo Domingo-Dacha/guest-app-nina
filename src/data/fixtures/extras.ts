@@ -53,7 +53,14 @@ export const extrasFixture: ExtrasCatalog = {
       ],
       addon: { name: "Украшение в бочку", price: 200000 },
       firAddon: { name: "Сибирская пихта", price: 200000 },
-      robeAddon: { name: "Халат", price: 50000 },
+      robeAddon: {
+        name: "Халат",
+        price: 50000,
+        image: {
+          src: "/images/extras/robes.jpg",
+          alt: "Халаты Domingo с надписью «не парься на даче»",
+        },
+      },
     },
     {
       id: "breakfast",
@@ -74,7 +81,7 @@ export const extrasFixture: ExtrasCatalog = {
       quantityLabel: "Количество наборов на двоих",
       images: [
         {
-          src: "/images/extras/breakfast-table.jpg",
+          src: "/images/extras/breakfast-new.jpg",
           alt: "Завтрак с кашей, блинами и круассанами на террасе",
         },
         {
@@ -93,6 +100,7 @@ export const extrasFixture: ExtrasCatalog = {
           "Продукты для неспешного загородного отдыха.",
         ],
         ["lunch", "Обед", "Продолжите день обедом в вашем доме."],
+        ["burger", "Бургер", "Бургер Domingo для вашего загородного отдыха."],
         ["dinner", "Ужин", "Соберитесь за столом после насыщенного дня."],
       ] as const
     ).map(([id, name, summary]) => ({
@@ -100,6 +108,29 @@ export const extrasFixture: ExtrasCatalog = {
       name,
       summary,
       category: "food" as const,
+      images:
+        id === "farm-basket"
+          ? [
+              {
+                src: "/images/extras/farm-basket.jpg",
+                alt: "Фермерская корзина: молочные продукты, хлеб и сырники",
+              },
+            ]
+          : id === "lunch"
+            ? [
+                {
+                  src: "/images/extras/lunch.jpg",
+                  alt: "Обед: паста с грибами и овощной салат",
+                },
+              ]
+            : id === "burger"
+              ? [
+                  {
+                    src: "/images/extras/burger.jpg",
+                    alt: "Бургер с фирменной булочкой Domingo Dacha",
+                  },
+                ]
+              : undefined,
       description: summary,
       includes: [],
       conditions:

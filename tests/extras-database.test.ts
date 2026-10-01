@@ -62,6 +62,7 @@ beforeAll(async () => {
   await db.exec(
     await readFile("db/migrations/0003_extras_catalog.sql", "utf8"),
   );
+  await db.exec(await readFile("db/migrations/0004_extras_burger.sql", "utf8"));
 }, 30000);
 afterAll(async () => {
   await db.close();

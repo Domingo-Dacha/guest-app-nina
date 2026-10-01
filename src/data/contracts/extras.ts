@@ -6,6 +6,7 @@ export const serviceIdSchema = z.enum([
   "late-checkout",
   "farm-basket",
   "lunch",
+  "burger",
   "dinner",
   "bath-vensky",
   "bath-gavshino",
@@ -45,7 +46,11 @@ export type ExtraService = {
   times: string[];
   addon?: { name: string; price: number };
   firAddon?: { name: string; price: number };
-  robeAddon?: { name: string; price: number };
+  robeAddon?: {
+    name: string;
+    price: number;
+    image?: { src: string; alt: string };
+  };
   durations?: { days: 1 | 2; price: number }[];
   images?: { src: string; alt: string }[];
   allowedHouses?: string[];

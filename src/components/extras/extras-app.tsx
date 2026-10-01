@@ -35,7 +35,12 @@ import {
   availableForStay,
   serviceBlockReason,
 } from "@/lib/extras-rules";
-import { ItemSummary, OrderDetails, ServiceArt } from "./extras-parts";
+import {
+  ItemSummary,
+  OrderDetails,
+  ServiceArt,
+  ServicePhoto,
+} from "./extras-parts";
 
 type Props = { catalog: ExtrasCatalog; stay: StayContext; initialNow: string };
 export function ExtrasApp(props: Props) {
@@ -645,6 +650,9 @@ export function ExtrasApp(props: Props) {
               )}
               {service.robeAddon && (
                 <>
+                  {service.robeAddon.image && (
+                    <ServicePhoto picture={service.robeAddon.image} />
+                  )}
                   <label htmlFor="extra-robes">
                     Халаты · {money(service.robeAddon.price)} за штуку
                   </label>
