@@ -45,7 +45,9 @@ async function main() {
   }
 }
 
-void main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : "Migration failed");
+void main().catch(() => {
+  console.error(
+    "Migration failed. Check database connectivity and migration SQL. Connection details are not logged.",
+  );
   process.exitCode = 1;
 });
