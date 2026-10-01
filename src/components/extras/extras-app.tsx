@@ -466,7 +466,13 @@ export function ExtrasApp(props: Props) {
                     ? "Бесплатно"
                     : money(pricedItem(draft, catalog).unitPrice)}
                 </strong>
-                <span>{service.unit}</span>
+                <span>
+                  {service.durations
+                    ? draft.durationDays === 2
+                      ? "за 2 дня"
+                      : "за 1 день"
+                    : service.unit}
+                </span>
               </div>
               {service.durations && (
                 <>

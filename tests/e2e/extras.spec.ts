@@ -133,6 +133,8 @@ test("full extras journey keeps drafts, edits the cart, handles failed/cancelled
   page,
   context,
 }, testInfo) => {
+  // The complete journey includes cart edits, three payment outcomes and screenshots.
+  test.setTimeout(60_000);
   const harness = await setup(page, context);
   await page.goto("/");
   await page.getByRole("link", { name: "Допуслуги", exact: true }).click();
@@ -338,6 +340,12 @@ test("furako duration and optional extras survive cart editing and order reload"
   await expect(
     page.getByRole("button", { name: /Добавить в корзину/ }),
   ).toContainText(/13\s*000/);
+  await expect(page.locator(".extras-base-price")).toContainText("за 2 дня");
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(
+    await page.evaluate(() => document.documentElement.clientWidth),
+  );
   await page.screenshot({
     path: testInfo.outputPath("furako-options.png"),
     fullPage: true,
