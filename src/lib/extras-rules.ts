@@ -190,6 +190,11 @@ export function validateSelection(
     return "Проверьте количество халатов.";
   return null;
 }
+export function isNewYearHoliday(date: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const monthDay = date.slice(5);
+  return monthDay === "12-31" || (monthDay >= "01-01" && monthDay <= "01-10");
+}
 export function pricedItem(item: Selection, catalog: ExtrasCatalog): CartItem {
   const service = serviceFor(catalog, item.serviceId);
   return {
@@ -202,6 +207,7 @@ export function pricedItem(item: Selection, catalog: ExtrasCatalog): CartItem {
       : undefined,
     unitPrice:
       (service.priceByDate?.[item.date] ??
+        (isNewYearHoliday(item.date) ? service.newYearPrice : undefined) ??
         service.durations?.find((d) => d.days === (item.durationDays ?? 1))
           ?.price ??
         service.price ??

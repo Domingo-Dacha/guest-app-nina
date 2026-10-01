@@ -65,6 +65,7 @@ export type ExtraService = {
   sessionHours?: number;
   packageServiceId?: ServiceId;
   priceByDate?: Record<string, number>;
+  newYearPrice?: number;
   images?: { src: string; alt: string }[];
   allowedHouses?: string[];
   timing?: "agreement";

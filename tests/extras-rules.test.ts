@@ -11,6 +11,7 @@ import {
   validateCheckout,
   validateSelection,
   availableForStay,
+  isNewYearHoliday,
 } from "@/lib/extras-rules";
 
 const stay: StayContext = {
@@ -88,7 +89,111 @@ describe("extras booking rules", () => {
         catalog,
         before,
       ),
-    ).toContain("Стоимость уточняется");
+    ).toBeNull();
+  });
+  it("applies the annual New Year tariff only from Dec 31 through Jan 10", () => {
+    for (const [date, expected] of [
+      ["2026-12-30", 800000],
+      ["2026-12-31", 1000000],
+      ["2027-01-01", 1000000],
+      ["2027-01-10", 1000000],
+      ["2027-01-11", 800000],
+      ["2028-12-31", 1000000],
+    ] as const) {
+      expect(
+        pricedItem(
+          { ...selection, serviceId: "bath-vensky", date, time: "16:00" },
+          catalog,
+        ).unitPrice,
+      ).toBe(expected);
+      expect(isNewYearHoliday(date)).toBe(expected === 1000000);
+    }
+    expect(isNewYearHoliday("")).toBe(false);
+    expect(
+      pricedItem(
+        { ...selection, serviceId: "bath-vensky-furako", date: "2027-01-10" },
+        catalog,
+      ).unitPrice,
+    ).toBe(1500000);
+    expect(
+      pricedItem(
+        { ...selection, serviceId: "bath-vensky-furako", date: "2027-01-11" },
+        catalog,
+      ).unitPrice,
+    ).toBe(1300000);
+    const holidayStay = {
+      ...stay,
+      checkIn: "2026-12-30",
+      checkOut: "2027-01-11",
+    };
+    const holiday = {
+      ...selection,
+      serviceId: "bath-vensky" as const,
+      date: "2026-12-31",
+      time: "16:00",
+      durationHours: 3,
+      robes: 2,
+    };
+    expect(cartTotal([pricedItem(holiday, catalog)])).toBe(1350000);
+    expect(() =>
+      validateCheckout(
+        [{ ...pricedItem(holiday, catalog), unitPrice: 1050000 }],
+        holidayStay,
+        catalog,
+        1150000,
+        before,
+      ),
+    ).toThrow("Цены изменились");
+  });
+  it("prices three-hour saunas and separate furako and preserves Meridian-only access", () => {
+    for (const [serviceId, price] of [
+      ["bath-gavshino", 750000],
+      ["bath-paradise", 1000000],
+    ] as const) {
+      const choice = { ...selection, serviceId, time: "16:00", robes: 2 };
+      expect(cartTotal([pricedItem(choice, catalog)])).toBe(price + 100000);
+      expect(
+        cartTotal([pricedItem({ ...choice, durationHours: 4 }, catalog)]),
+      ).toBe(price + 350000);
+      expect(
+        validateSelection(
+          { ...choice, durationHours: 2 },
+          { ...stay, houseName: "Меридиан" },
+          catalog,
+          before,
+        ),
+      ).toContain("длительность");
+      expect(
+        validateSelection(
+          choice,
+          { ...stay, houseName: "Меридиан" },
+          catalog,
+          before,
+        ),
+      ).toBeNull();
+    }
+    expect(
+      validateSelection(
+        { ...selection, serviceId: "bath-paradise", time: "16:00" },
+        stay,
+        catalog,
+        before,
+      ),
+    ).toContain("Меридиана");
+    expect(
+      cartTotal([
+        pricedItem(
+          {
+            ...selection,
+            serviceId: "furako-vensky",
+            time: "16:00",
+            robes: 2,
+            decoration: true,
+          },
+          catalog,
+        ),
+      ]),
+    ).toBe(900000);
   });
   it("prices both furako days and independent optional extras without enabling them by default", () => {
     const bath: Selection = {

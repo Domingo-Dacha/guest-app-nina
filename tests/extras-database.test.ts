@@ -69,6 +69,57 @@ afterAll(async () => {
   await db.close();
 });
 describe("extras PostgreSQL persistence (isolated, no server or external database)", () => {
+  it("stores new sauna tariffs, extensions and robes as paid order snapshots", async () => {
+    const meridianStay = { ...stay, houseName: "Меридиан" };
+    for (const [serviceId, total] of [
+      ["bath-gavshino", 1100000],
+      ["bath-paradise", 1350000],
+      ["furako-vensky", 700000],
+    ] as const) {
+      const repository = repo(serviceId);
+      await repository.execute(
+        {
+          action: "save",
+          version: 0,
+          item: {
+            id: randomUUID(),
+            serviceId,
+            date: "2026-10-17",
+            time: "16:00",
+            quantity: 1,
+            decoration: false,
+            robes: 2,
+            ...(serviceId !== "furako-vensky" ? { durationHours: 4 } : {}),
+          },
+        },
+        meridianStay,
+        catalog,
+        now,
+      );
+      await repository.execute(
+        {
+          action: "checkout",
+          version: 1,
+          total,
+          key: randomUUID(),
+          comment: "",
+        },
+        meridianStay,
+        catalog,
+        now,
+      );
+      const [order] = await repository.listOrders(meridianStay);
+      expect(order.total).toBe(total);
+      expect(order.items[0]).toMatchObject({
+        robes: 2,
+        robePrice: 50000,
+        fulfillmentStatus: "awaiting_approval",
+      });
+      expect(order.items[0].durationHours).toBe(
+        serviceId === "furako-vensky" ? undefined : 4,
+      );
+    }
+  });
   it("persists bath package duration, robes and decoration together with firewood quantities", async () => {
     const packageItem = {
       id: randomUUID(),

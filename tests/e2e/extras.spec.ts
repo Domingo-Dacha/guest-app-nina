@@ -394,14 +394,65 @@ test("bath package preserves dates, hours and robes, and firewood keeps quantiti
   await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
   await page.getByLabel("Желаемое время начала").selectOption("16:00");
   await page.getByLabel(/Халаты/).selectOption("2");
+  await page.getByLabel("Длительность бани").selectOption("4");
   await expect(
     page.getByRole("button", { name: /Добавить в корзину/ }),
-  ).toHaveCount(0);
-  await expect(page.getByText(/выбор не отправляется/)).toBeVisible();
+  ).toContainText(/11\s*000/);
   state.stay.houseName = "Меридиан";
   await page.goto("/extras?view=service&service=bath-paradise");
   await expect(page.getByLabel("Дата", { exact: true })).toBeVisible();
   await expect(page.getByLabel(/Халаты/)).toBeVisible();
+  await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
+  await page.getByLabel("Желаемое время начала").selectOption("16:00");
+  await page.getByLabel("Длительность бани").selectOption("4");
+  await page.getByLabel(/Халаты/).selectOption("2");
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toContainText(/13\s*500/);
+});
+test("New Year tariffs follow the selected date and separate sauna furako costs 6000", async ({
+  page,
+  context,
+}, testInfo) => {
+  const { state } = await setup(page, context);
+  state.stay.checkIn = "2026-12-30";
+  state.stay.checkOut = "2027-01-12";
+  state.serverNow = "2026-12-29T10:00:00Z";
+  await page.goto("/extras?view=service&service=bath-vensky");
+  await page.getByLabel("Дата", { exact: true }).selectOption("2026-12-30");
+  await page.getByLabel("Желаемое время начала").selectOption("16:00");
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toContainText(/8\s*000/);
+  await page.getByLabel("Дата", { exact: true }).selectOption("2026-12-31");
+  await page.getByLabel("Желаемое время начала").selectOption("16:00");
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toContainText(/10\s*000/);
+  await expect(page.getByText(/Применён новогодний тариф/)).toBeVisible();
+  await page.getByRole("button", { name: /Добавить фурако на 4 часа/ }).click();
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toContainText(/15\s*000/);
+  await page.getByLabel("Дата", { exact: true }).selectOption("2027-01-10");
+  await expect(page.locator(".extras-base-price")).toContainText(/15\s*000/);
+  await page.getByLabel("Дата", { exact: true }).selectOption("2027-01-11");
+  await expect(page.locator(".extras-base-price")).toContainText(/13\s*000/);
+  await page.goto("/extras?view=service&service=furako-vensky");
+  await page.getByLabel("Дата", { exact: true }).selectOption("2026-12-31");
+  await page.getByLabel("Желаемое время начала").selectOption("16:00");
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toContainText(/6\s*000/);
+  await page.screenshot({
+    path: testInfo.outputPath("separate-furako.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: /Добавить в корзину/ }).click();
+  expect(state.cart.items[0]).toMatchObject({
+    serviceId: "furako-vensky",
+    unitPrice: 600000,
+  });
 });
 test("furako duration and optional extras survive cart editing and order reload", async ({
   page,
@@ -475,14 +526,12 @@ test("basket opens a Telegram draft with the stay house and bicycles are retired
     page.getByRole("button", { name: /Добавить в корзину/ }),
   ).toHaveCount(0);
   await page.goto("/extras?category=food");
-  const card = page
-    .locator("article")
-    .filter({
-      has: page.getByRole("heading", {
-        name: "Фермерская корзина",
-        exact: true,
-      }),
-    });
+  const card = page.locator("article").filter({
+    has: page.getByRole("heading", {
+      name: "Фермерская корзина",
+      exact: true,
+    }),
+  });
   await expect(card).not.toContainText("Время по согласованию");
   await expect(card).not.toContainText("Стоимость уточняется");
   await page

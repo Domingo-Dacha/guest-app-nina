@@ -35,6 +35,7 @@ import {
   validateSelection,
   availableForStay,
   serviceBlockReason,
+  isNewYearHoliday,
 } from "@/lib/extras-rules";
 import {
   ItemSummary,
@@ -513,6 +514,20 @@ export function ExtrasApp(props: Props) {
                       : service.unit}
                 </span>
               </div>
+              {service.newYearPrice !== undefined && (
+                <p className="extras-note">
+                  {isNewYearHoliday(draft.date)
+                    ? "Применён новогодний тариф. "
+                    : ""}
+                  С 31 декабря по 10 января включительно —{" "}
+                  {money(service.newYearPrice)} за{" "}
+                  {service.hourly?.included ?? service.sessionHours} ч бани
+                  {service.sessionHours
+                    ? ` и ${service.sessionHours} ч фурако`
+                    : ""}
+                  .
+                </p>
+              )}
               {service.hourly && (
                 <>
                   <label htmlFor="extra-hours">Длительность бани</label>
@@ -566,7 +581,13 @@ export function ExtrasApp(props: Props) {
                     });
                   }}
                 >
-                  Добавить фурако на 4 часа · +5 000 ₽
+                  Добавить фурако на 4 часа · +
+                  {money(
+                    pricedItem(
+                      { ...draft, serviceId: service.packageServiceId },
+                      catalog,
+                    ).unitPrice - pricedItem(draft, catalog).unitPrice,
+                  )}
                 </Button>
               )}
               {service.durations && (

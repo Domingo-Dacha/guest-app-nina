@@ -9,7 +9,7 @@ alter table extras_cart_items
   add constraint extras_cart_items_robes_service_check check (robes = 0 or service_id in ('furako', 'bath-vensky', 'bath-vensky-furako', 'furako-vensky', 'bath-gavshino', 'bath-paradise')),
   add constraint extras_cart_items_decoration_service_check check (not decoration or service_id in ('furako', 'bath-vensky-furako', 'furako-vensky')),
   add column duration_hours integer,
-  add constraint extras_cart_items_duration_hours_check check (duration_hours is null or (service_id in ('bath-vensky', 'bath-vensky-furako') and duration_hours between 2 and 12));
+  add constraint extras_cart_items_duration_hours_check check (duration_hours is null or (service_id in ('bath-vensky', 'bath-vensky-furako') and duration_hours between 2 and 12) or (service_id in ('bath-gavshino', 'bath-paradise') and duration_hours between 3 and 12));
 -- statement-breakpoint
 alter table extras_order_items
   drop constraint extras_order_items_service_id_check,
@@ -22,4 +22,4 @@ alter table extras_order_items
   add constraint extras_order_items_robes_service_check check (robes = 0 or service_id in ('furako', 'bath-vensky', 'bath-vensky-furako', 'furako-vensky', 'bath-gavshino', 'bath-paradise')),
   add constraint extras_order_items_decoration_service_check check (not decoration or service_id in ('furako', 'bath-vensky-furako', 'furako-vensky')),
   add column duration_hours integer,
-  add constraint extras_order_items_duration_hours_check check (duration_hours is null or (service_id in ('bath-vensky', 'bath-vensky-furako') and duration_hours between 2 and 12));
+  add constraint extras_order_items_duration_hours_check check (duration_hours is null or (service_id in ('bath-vensky', 'bath-vensky-furako') and duration_hours between 2 and 12) or (service_id in ('bath-gavshino', 'bath-paradise') and duration_hours between 3 and 12));
