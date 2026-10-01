@@ -68,28 +68,9 @@ jobs:
         run: |
           echo "Automatic delivery from PR #$SOURCE_PR at $VERIFIED_SHA." >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Pull Vercel production configuration
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TEAM_TOKEN }}
-        run: >-
-          npx --yes vercel@60.1.3 pull --yes --environment=production
-          --scope=domingo-dacha --token="$VERCEL_TOKEN"
-
-      - name: Build production artifact
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TEAM_TOKEN }}
-        run: >-
-          npx --yes vercel@60.1.3 build --prod
-          --scope=domingo-dacha --token="$VERCEL_TOKEN"
-
-      - name: Apply test database migrations
-        run: >-
-          node --env-file=.vercel/.env.production.local
-          --import tsx scripts/migrate.ts
-
-      - name: Publish production artifact
+      - name: Build, migrate and publish on Vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TEAM_TOKEN }}
         run: |
-          deployment_url="$(npx --yes vercel@60.1.3 deploy --prebuilt --prod --scope=domingo-dacha --token="$VERCEL_TOKEN")"
+          deployment_url="$(npx --yes vercel@60.1.3 deploy --yes --prod --scope=domingo-dacha --token="$VERCEL_TOKEN")"
           echo "Deployment: $deployment_url" >> "$GITHUB_STEP_SUMMARY"
