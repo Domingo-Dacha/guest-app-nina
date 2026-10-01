@@ -324,12 +324,11 @@ test("expanded catalog shows unknown prices, photos and Meridian-only sauna", as
   await expect(page.getByRole("heading", { name: "Райская баня" })).toHaveCount(
     0,
   );
+  const venskyPhoto = page.getByAltText("Интерьер: Баня «Венский»").first();
+  await venskyPhoto.scrollIntoViewIfNeeded();
   await expect
     .poll(() =>
-      page
-        .getByAltText("Интерьер: Баня «Венский»")
-        .first()
-        .evaluate((image) => (image as HTMLImageElement).naturalWidth),
+      venskyPhoto.evaluate((image) => (image as HTMLImageElement).naturalWidth),
     )
     .toBeGreaterThan(0);
   state.stay.houseName = "Меридиан";
