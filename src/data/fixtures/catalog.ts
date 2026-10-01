@@ -1,3 +1,4 @@
+import { extrasCopy } from "./extras-copy";
 import { catalogFixtureSchema } from "@/data/contracts/catalog";
 
 export const catalogFixture = catalogFixtureSchema.parse({
@@ -35,18 +36,18 @@ export const catalogFixture = catalogFixtureSchema.parse({
   ],
   services: [
     {
-      id: "late-checkout",
-      name: "Поздний выезд",
-      description: "Оставайтесь в доме до 18:00, если после вас нет заезда.",
-      priceKopecks: 350000,
-      conditions: "Подтверждается командой не позднее вечера накануне.",
-    },
-    {
       id: "breakfast",
-      name: "Завтрак в доме",
-      description: "Корзина с локальными продуктами на двоих.",
+      name: "Завтрак",
+      description: extrasCopy.breakfast,
       priceKopecks: 180000,
       conditions: "Заказ до 18:00 предыдущего дня.",
+    },
+    {
+      id: "late-checkout",
+      name: "Поздний выезд",
+      description: extrasCopy["late-checkout"],
+      priceKopecks: 350000,
+      conditions: "Подтверждается командой не позднее вечера накануне.",
     },
     {
       id: "firewood",
@@ -104,7 +105,7 @@ export const catalogFixture = catalogFixtureSchema.parse({
     {
       id: "sup-rental",
       title: "Прогулка на сапах",
-      description: "Тестовая рекомендация для тёплого сезона.",
+      description: extrasCopy.sup,
       travelMinutes: 18,
       category: "activity",
     },
