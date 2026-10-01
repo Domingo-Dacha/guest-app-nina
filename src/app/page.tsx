@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AppShell } from "@/components/domingo/app-shell";
 import { HouseCard } from "@/components/domingo/house-card";
 import { RequestDemo } from "@/components/domingo/request-demo";
@@ -32,6 +33,9 @@ export default async function Home() {
         <p className="status-badge">Команда Нина готова</p>
         <p className="eyebrow">Универсальный старт команды</p>
         <h1>Соберите полезный гостевой сценарий</h1>
+        <Link className="button button--primary" href="/extras">
+          Допуслуги
+        </Link>
         <p>
           Здесь нет заранее выбранного продукта. Используйте компоненты,
           тестовые данные и серверные заявки, чтобы быстро проверить свою идею.

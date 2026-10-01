@@ -9,12 +9,17 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:3000",
     trace: "on-first-retry",
+    screenshot: "only-on-failure",
   },
   webServer: {
     command: "npm run dev",
     url: "http://localhost:3000/access",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    env: {
+      SESSION_SECRET: "playwright-only-session-secret",
+      TEAM_SLUG: "local",
+    },
   },
   projects: [
     { name: "desktop-chromium", use: { ...devices["Desktop Chrome"] } },
