@@ -52,23 +52,125 @@ async function add(
 beforeAll(async () => {
   db = new PGlite();
   await db.exec(await readFile("db/migrations/0002_extras.sql", "utf8"));
+  await db.exec(`
+    insert into extras_carts (team_slug, stay_id) values ('legacy', 'stay');
+    insert into extras_orders (id,team_slug,stay_id,cart_version,idempotency_key,guest_name,guest_contact,house_name,check_in,check_out,check_in_time,check_out_time,guests,total,payment_status)
+    values ('10000000-0000-4000-8000-000000000001','legacy','stay',0,'10000000-0000-4000-8000-000000000002','Тест','guest@example.test','Дом у сосен','2026-10-16','2026-10-18','15:00','12:00',4,600000,'paid');
+    insert into extras_order_items (team_slug,stay_id,order_id,id,service_id,name,service_date,requested_time,quantity,decoration,unit_price,addon_price,fulfillment_status)
+    values ('legacy','stay','10000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000003','furako','Фурако','2026-10-17','19:00',1,false,600000,0,'awaiting_approval');
+  `);
+  await db.exec(
+    await readFile("db/migrations/0003_extras_catalog.sql", "utf8"),
+  );
 }, 30000);
 afterAll(async () => {
   await db.close();
 });
 describe("extras PostgreSQL persistence (isolated, no server or external database)", () => {
+  it("preserves historical order prices while migrating defaults for new options", async () => {
+    const [order] = await repo("legacy").listOrders(stay);
+    expect(order.total).toBe(600000);
+    expect(order.items[0]).toMatchObject({
+      unitPrice: 600000,
+      durationDays: 1,
+      fir: false,
+      robes: 0,
+    });
+  });
+  it("persists two-day furako and extra prices, then restores exactly the same order", async () => {
+    await repo("options").execute(
+      {
+        action: "save",
+        version: 0,
+        item: {
+          id: randomUUID(),
+          serviceId: "furako",
+          date: "2026-10-16",
+          time: "19:00",
+          quantity: 1,
+          decoration: true,
+          durationDays: 2,
+          fir: true,
+          robes: 2,
+        },
+      },
+      stay,
+      catalog,
+      now,
+    );
+    expect((await repo("options").getCart(stay)).items[0]).toMatchObject({
+      durationDays: 2,
+      firPrice: 200000,
+      robePrice: 50000,
+      robes: 2,
+    });
+    await repo("options").execute(
+      {
+        action: "checkout",
+        version: 1,
+        key: randomUUID(),
+        comment: "",
+        total: 1300000,
+      },
+      stay,
+      catalog,
+      now,
+    );
+    expect((await repo("options").listOrders(stay))[0].items[0]).toMatchObject({
+      durationDays: 2,
+      fir: true,
+      robes: 2,
+      unitPrice: 800000,
+      addonPrice: 200000,
+      firPrice: 200000,
+      robePrice: 50000,
+    });
+  });
+  it("saves a free bicycle order without marking it paid", async () => {
+    await repo("free").execute(
+      {
+        action: "save",
+        version: 0,
+        item: {
+          id: randomUUID(),
+          serviceId: "bicycles",
+          date: "2026-10-17",
+          time: "По согласованию",
+          quantity: 2,
+          decoration: false,
+        },
+      },
+      stay,
+      catalog,
+      now,
+    );
+    const command = {
+      action: "checkout" as const,
+      version: 1,
+      key: randomUUID(),
+      comment: "",
+      total: 0,
+    };
+    const order = await repo("free").execute(command, stay, catalog, now);
+    expect(order).toMatchObject({ total: 0, paymentStatus: "not_required" });
+    expect(order?.items[0].fulfillmentStatus).toBe("awaiting_approval");
+    expect((await repo("free").getCart(stay)).items).toHaveLength(0);
+    expect((await repo("free").execute(command, stay, catalog, now))?.id).toBe(
+      order?.id,
+    );
+  });
   it("saves two services and clears the cart atomically, preserving separate confirmation and payment statuses", async () => {
     await add("checkout");
     await add("checkout", "breakfast", 1);
     const command: ExtrasCommand = {
       action: "checkout",
       version: 2,
-      total: 990000,
+      total: 1090000,
       comment: "Демонстрация",
       key: randomUUID(),
     };
     const order = await repo("checkout").execute(command, stay, catalog, now);
-    expect(order?.total).toBe(990000);
+    expect(order?.total).toBe(1090000);
     expect(order?.paymentStatus).toBe("paid");
     expect(
       order?.items.find((i) => i.serviceId === "furako")?.fulfillmentStatus,
@@ -177,7 +279,7 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
         {
           action: "checkout",
           version: 1,
-          total: 800000,
+          total: 900000,
           key: randomUUID(),
           comment: "",
         },
@@ -195,7 +297,7 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
     const command = {
       action: "checkout" as const,
       version: 1,
-      total: 800000,
+      total: 900000,
       comment: "",
     };
     const orders = await Promise.all([

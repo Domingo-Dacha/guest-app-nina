@@ -29,6 +29,11 @@ function itemFromRow(row: Row): CartItem {
     decoration: Boolean(row.decoration),
     unitPrice: Number(row.unit_price),
     addonPrice: Number(row.addon_price),
+    durationDays: Number(row.duration_days ?? 1) as 1 | 2,
+    fir: Boolean(row.fir),
+    robes: Number(row.robes ?? 0),
+    firPrice: Number(row.fir_price ?? 0),
+    robePrice: Number(row.robe_price ?? 0),
   };
 }
 // Every read and write is scoped to both the team and the existing demo stay.
@@ -135,9 +140,9 @@ export class PostgresExtrasRepository implements ExtrasRepository {
       );
       result = await this.query(
         `${gate}
-        insert into extras_cart_items (team_slug,stay_id,id,service_id,service_date,requested_time,quantity,decoration,unit_price,addon_price)
-        select team_slug,stay_id,$4,$5,$6,$7,$8,$9,$10,$11 from gate
-        on conflict (team_slug,stay_id,id) do update set service_id=excluded.service_id,service_date=excluded.service_date,requested_time=excluded.requested_time,quantity=excluded.quantity,decoration=excluded.decoration,unit_price=excluded.unit_price,addon_price=excluded.addon_price returning id`,
+        insert into extras_cart_items (team_slug,stay_id,id,service_id,service_date,requested_time,quantity,decoration,unit_price,addon_price,duration_days,fir,robes,fir_price,robe_price)
+        select team_slug,stay_id,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16 from gate
+        on conflict (team_slug,stay_id,id) do update set service_id=excluded.service_id,service_date=excluded.service_date,requested_time=excluded.requested_time,quantity=excluded.quantity,decoration=excluded.decoration,unit_price=excluded.unit_price,addon_price=excluded.addon_price,duration_days=excluded.duration_days,fir=excluded.fir,robes=excluded.robes,fir_price=excluded.fir_price,robe_price=excluded.robe_price returning id`,
         [
           ...scope,
           item.id,
@@ -148,6 +153,11 @@ export class PostgresExtrasRepository implements ExtrasRepository {
           item.decoration,
           item.unitPrice,
           item.addonPrice,
+          item.durationDays,
+          item.fir,
+          item.robes,
+          item.firPrice,
+          item.robePrice,
         ],
       );
     } else if (command.action === "remove") {
@@ -158,7 +168,7 @@ export class PostgresExtrasRepository implements ExtrasRepository {
     } else if (command.action === "reprice") {
       const prices = cart.items.map((i) => pricedItem(i, catalog));
       result = await this.query(
-        `${gate}, updated as (update extras_cart_items i set unit_price=p."unitPrice",addon_price=p."addonPrice" from gate g, jsonb_to_recordset($4::jsonb) as p(id uuid,"unitPrice" integer,"addonPrice" integer) where i.team_slug=g.team_slug and i.stay_id=g.stay_id and i.id=p.id returning i.id) select * from gate`,
+        `${gate}, updated as (update extras_cart_items i set unit_price=p."unitPrice",addon_price=p."addonPrice",fir_price=p."firPrice",robe_price=p."robePrice" from gate g, jsonb_to_recordset($4::jsonb) as p(id uuid,"unitPrice" integer,"addonPrice" integer,"firPrice" integer,"robePrice" integer) where i.team_slug=g.team_slug and i.stay_id=g.stay_id and i.id=p.id returning i.id) select * from gate`,
         [...scope, JSON.stringify(prices)],
       );
     } else {
@@ -181,11 +191,11 @@ export class PostgresExtrasRepository implements ExtrasRepository {
       result = await this.query(
         `${gate}, new_order as (
         insert into extras_orders (id,team_slug,stay_id,cart_version,idempotency_key,guest_name,guest_contact,house_name,check_in,check_out,check_in_time,check_out_time,guests,comment,total,payment_status)
-        select $4,team_slug,stay_id,$3,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'paid' from gate returning *
+        select $4,team_slug,stay_id,$3,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,case when $15::integer=0 then 'not_required' else 'paid' end from gate returning *
       ), saved_items as (
-        insert into extras_order_items (team_slug,stay_id,order_id,id,service_id,name,addon_name,service_date,requested_time,confirmed_time,quantity,decoration,unit_price,addon_price,fulfillment_status)
-        select o.team_slug,o.stay_id,o.id,p.id,p."serviceId",p.name,p."addonName",p.date,p.time,p."confirmedTime",p.quantity,p.decoration,p."unitPrice",p."addonPrice",p."fulfillmentStatus" from new_order o,
-        jsonb_to_recordset($16::jsonb) as p(id uuid,"serviceId" text,name text,"addonName" text,date date,time text,"confirmedTime" text,quantity integer,decoration boolean,"unitPrice" integer,"addonPrice" integer,"fulfillmentStatus" text) returning id
+        insert into extras_order_items (team_slug,stay_id,order_id,id,service_id,name,addon_name,service_date,requested_time,confirmed_time,quantity,decoration,unit_price,addon_price,fulfillment_status,duration_days,fir,robes,fir_price,robe_price)
+        select o.team_slug,o.stay_id,o.id,p.id,p."serviceId",p.name,p."addonName",p.date,p.time,p."confirmedTime",p.quantity,p.decoration,p."unitPrice",p."addonPrice",p."fulfillmentStatus",p."durationDays",p.fir,p.robes,p."firPrice",p."robePrice" from new_order o,
+        jsonb_to_recordset($16::jsonb) as p(id uuid,"serviceId" text,name text,"addonName" text,date date,time text,"confirmedTime" text,quantity integer,decoration boolean,"unitPrice" integer,"addonPrice" integer,"fulfillmentStatus" text,"durationDays" integer,fir boolean,robes integer,"firPrice" integer,"robePrice" integer) returning id
       ), cleared as (
         delete from extras_cart_items i using new_order o where i.team_slug=o.team_slug and i.stay_id=o.stay_id and (select count(*) from saved_items)>0 returning i.id
       ) select id from new_order`,

@@ -24,8 +24,18 @@ export const extrasFixture: ExtrasCatalog = {
       ],
       conditions:
         "Время требует согласования. После оплаты менеджер свяжется с вами. Вы выбираете желаемое время, а не свободный слот.",
-      price: 600000,
-      unit: "за подготовку",
+      price: 700000,
+      unit: "за 1 день · 2 дня — 8 000 ₽",
+      durations: [
+        { days: 1, price: 700000 },
+        { days: 2, price: 800000 },
+      ],
+      images: [
+        {
+          src: "/images/extras/furako.jpg",
+          alt: "Фурако на деревянной террасе среди деревьев",
+        },
+      ],
       confirmation: "manual",
       times: [
         "10:00",
@@ -41,7 +51,9 @@ export const extrasFixture: ExtrasCatalog = {
         "20:00",
         "21:00",
       ],
-      addon: { name: "Украшение фурако", price: 200000 },
+      addon: { name: "Украшение в бочку", price: 200000 },
+      firAddon: { name: "Сибирская пихта", price: 200000 },
+      robeAddon: { name: "Халат", price: 50000 },
     },
     {
       id: "breakfast",
@@ -59,8 +71,120 @@ export const extrasFixture: ExtrasCatalog = {
         "Оформите заказ до 18:00 предыдущего дня по московскому времени. Состав набора демонстрационный; при реальном запуске потребуется меню и информация об аллергенах.",
       price: 190000,
       unit: "за набор на двоих",
+      quantityLabel: "Количество наборов на двоих",
+      images: [
+        {
+          src: "/images/extras/breakfast-table.jpg",
+          alt: "Завтрак с кашей, блинами и круассанами на террасе",
+        },
+        {
+          src: "/images/extras/breakfast.jpg",
+          alt: "Каша с бананом и свежие круассаны",
+        },
+      ],
       confirmation: "automatic",
       times: ["08:00–08:30", "09:00–09:30"],
+    },
+    ...(
+      [
+        [
+          "farm-basket",
+          "Фермерская корзина",
+          "Продукты для неспешного загородного отдыха.",
+        ],
+        ["lunch", "Обед", "Продолжите день обедом в вашем доме."],
+        ["dinner", "Ужин", "Соберитесь за столом после насыщенного дня."],
+      ] as const
+    ).map(([id, name, summary]) => ({
+      id,
+      name,
+      summary,
+      category: "food" as const,
+      description: summary,
+      includes: [],
+      conditions:
+        "Состав, стоимость и условия заказа уточняются. Пока оформить эту услугу нельзя.",
+      price: null,
+      unit: "",
+      confirmation: "manual" as const,
+      times: [],
+    })),
+    ...(
+      [
+        ["bath-vensky", "Баня «Венский»"],
+        ["bath-gavshino", "Баня «Гавшино»"],
+        ["bath-paradise", "Райская баня"],
+      ] as const
+    ).map(([id, name]) => ({
+      id,
+      name,
+      category: "bath" as const,
+      summary:
+        id === "bath-paradise"
+          ? "Только для гостей «Меридиана»."
+          : "Время для тепла, пара и спокойного отдыха.",
+      description:
+        "Выберите баню для вашего отдыха. Стоимость, состав программы и время посещения уточняются.",
+      includes: [],
+      conditions:
+        "Стоимость и условия посещения уточняются. Пока оформить эту услугу нельзя.",
+      price: null,
+      unit: "",
+      confirmation: "manual" as const,
+      times: [],
+      images: [
+        {
+          src: "/images/extras/sauna.jpg",
+          alt: "Интерьер парной с панорамным окном — общее фото бань",
+        },
+      ],
+      ...(id === "bath-paradise" ? { allowedHouses: ["Меридиан"] } : {}),
+    })),
+    {
+      id: "sup",
+      category: "experiences",
+      name: "Сапы",
+      summary: "Прогулка по воде и новый взгляд на знакомые берега.",
+      description:
+        "Выберите дату и количество сапов. Длительность, время и возможность прогулки требуют согласования.",
+      includes: ["Сап для прогулки"],
+      conditions:
+        "2 000 ₽ за сап. Длительность и время согласовываются отдельно. Возможность прогулки зависит от погоды и наличия оборудования.",
+      price: 200000,
+      unit: "за сап · длительность по согласованию",
+      quantityLabel: "Количество сапов",
+      confirmation: "manual",
+      timing: "agreement",
+      times: ["По согласованию"],
+      images: [
+        {
+          src: "/images/extras/sup.jpg",
+          alt: "Гости на сапах на реке среди зелёных берегов",
+        },
+      ],
+    },
+    {
+      id: "bicycles",
+      category: "experiences",
+      name: "Велосипеды",
+      summary: "Откройте окрестности во время велосипедной прогулки.",
+      description:
+        "Велосипеды предоставляются бесплатно. Выберите дату и количество — наличие и время выдачи требуют подтверждения.",
+      includes: ["Пользование велосипедом"],
+      conditions:
+        "Бесплатно. Наличие, время выдачи и возврата согласовываются. После оформления заявка останется на согласовании.",
+      price: 0,
+      unit: "для гостей",
+      quantityLabel: "Количество велосипедов",
+      confirmation: "manual",
+      timing: "agreement",
+      times: ["По согласованию"],
+      images: [
+        {
+          src: "/images/extras/bicycles.jpg",
+          alt: "Велосипеды на прогулке по окрестностям",
+        },
+      ],
     },
     {
       id: "late-checkout",

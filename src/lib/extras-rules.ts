@@ -51,6 +51,23 @@ export function serviceFor(catalog: ExtrasCatalog, id: string): ExtraService {
     throw new ExtrasError("INVALID_SERVICE", "Эта услуга больше недоступна.");
   return service;
 }
+export function availableForStay(service: ExtraService, stay: StayContext) {
+  return (
+    !service.allowedHouses ||
+    service.allowedHouses.some(
+      (name) =>
+        name.toLocaleLowerCase("ru-RU") ===
+        stay.houseName.trim().toLocaleLowerCase("ru-RU"),
+    )
+  );
+}
+export function serviceBlockReason(service: ExtraService, stay: StayContext) {
+  if (!availableForStay(service, stay))
+    return "Эта услуга доступна только для гостей «Меридиана».";
+  if (service.price === null)
+    return "Стоимость уточняется. Оформление пока недоступно.";
+  return null;
+}
 export function dateReason(
   service: ExtraService,
   date: string,
@@ -58,6 +75,8 @@ export function dateReason(
   catalog: ExtrasCatalog,
   now: Date,
 ): string | null {
+  const blocked = serviceBlockReason(service, stay);
+  if (blocked) return blocked;
   if (!date) return "Выберите дату.";
   if (date < stay.checkIn || date > stay.checkOut)
     return "Выберите дату в пределах проживания.";
@@ -84,6 +103,14 @@ export function timeReason(
   const invalidDate = dateReason(service, date, stay, catalog, now);
   if (invalidDate) return invalidDate;
   if (!service.times.includes(time)) return "Выберите время.";
+  if (service.timing === "agreement") {
+    const clock = localClock(now, catalog.rules.timeZone);
+    return date === stay.checkOut &&
+      date === clock.date &&
+      clock.time >= stay.checkOutTime
+      ? "Проживание уже завершилось."
+      : null;
+  }
   const start = time.slice(0, 5),
     end = time.slice(-5);
   const clock = localClock(now, catalog.rules.timeZone);
@@ -106,29 +133,56 @@ export function validateSelection(
   now: Date,
 ): string | null {
   const service = serviceFor(catalog, item.serviceId);
+  const days = item.durationDays ?? 1;
+  if (
+    (days !== 1 && days !== 2) ||
+    (days !== 1 && !service.durations?.some((d) => d.days === days))
+  )
+    return "Проверьте длительность услуги.";
+  if (item.date && days > 1 && shiftDate(item.date, days - 1) >= stay.checkOut)
+    return "Для двух дней фурако выберите дату раньше: оба дня должны быть до дня выезда.";
   const reason = timeReason(service, item.date, item.time, stay, catalog, now);
   if (reason) return reason;
   if (
     !Number.isInteger(item.quantity) ||
     item.quantity < 1 ||
     item.quantity > catalog.rules.maxSets ||
-    (service.id !== "breakfast" && item.quantity !== 1)
+    (!service.quantityLabel && item.quantity !== 1)
   )
     return "Проверьте количество наборов.";
   if (item.decoration && !service.addon)
     return "Для этой услуги нет такого дополнения.";
+  if (item.fir && !service.firAddon)
+    return "Для этой услуги нет такого дополнения.";
+  if (
+    !Number.isInteger(item.robes ?? 0) ||
+    (item.robes ?? 0) < 0 ||
+    (item.robes ?? 0) > catalog.rules.maxSets ||
+    (item.robes && !service.robeAddon)
+  )
+    return "Проверьте количество халатов.";
   return null;
 }
 export function pricedItem(item: Selection, catalog: ExtrasCatalog): CartItem {
   const service = serviceFor(catalog, item.serviceId);
   return {
     ...item,
-    unitPrice: service.price,
+    durationDays: item.durationDays ?? 1,
+    fir: item.fir ?? false,
+    robes: item.robes ?? 0,
+    unitPrice:
+      service.durations?.find((d) => d.days === (item.durationDays ?? 1))
+        ?.price ??
+      service.price ??
+      0,
     addonPrice: item.decoration ? (service.addon?.price ?? 0) : 0,
+    firPrice: item.fir ? (service.firAddon?.price ?? 0) : 0,
+    robePrice: item.robes ? (service.robeAddon?.price ?? 0) : 0,
   };
 }
 export const lineTotal = (item: CartItem) =>
-  (item.unitPrice + item.addonPrice) * item.quantity;
+  (item.unitPrice + item.addonPrice + (item.firPrice ?? 0)) * item.quantity +
+  (item.robes ?? 0) * (item.robePrice ?? 0);
 export const cartTotal = (items: CartItem[]) =>
   items.reduce((sum, item) => sum + lineTotal(item), 0);
 export function pricesChanged(items: CartItem[], catalog: ExtrasCatalog) {
@@ -136,7 +190,9 @@ export function pricesChanged(items: CartItem[], catalog: ExtrasCatalog) {
     const current = pricedItem(item, catalog);
     return (
       current.unitPrice !== item.unitPrice ||
-      current.addonPrice !== item.addonPrice
+      current.addonPrice !== item.addonPrice ||
+      current.firPrice !== (item.firPrice ?? 0) ||
+      current.robePrice !== (item.robePrice ?? 0)
     );
   });
 }
@@ -183,6 +239,7 @@ export const fulfillmentLabels = {
 } as const;
 export const paymentLabels = {
   paid: "Оплачено",
+  not_required: "Без оплаты",
   refund_pending: "Возврат оформляется",
   refunded: "Возвращено",
 } as const;

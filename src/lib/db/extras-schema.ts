@@ -28,6 +28,11 @@ const selection = () => ({
   decoration: boolean("decoration").notNull(),
   unitPrice: integer("unit_price").notNull(),
   addonPrice: integer("addon_price").notNull(),
+  durationDays: integer("duration_days").notNull().default(1),
+  fir: boolean("fir").notNull().default(false),
+  robes: integer("robes").notNull().default(0),
+  firPrice: integer("fir_price").notNull().default(0),
+  robePrice: integer("robe_price").notNull().default(0),
 });
 export const extrasCarts = pgTable(
   "extras_carts",
