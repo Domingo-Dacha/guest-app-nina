@@ -13,6 +13,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav aria-label="Основная навигация">
           <Link href="/">Демо</Link>
           <Link href="/components">Компоненты</Link>
+          <Link href="/staff">Сотрудникам</Link>
         </nav>
       </header>
       <main>{children}</main>
