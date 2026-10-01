@@ -280,18 +280,16 @@ test("expanded catalog shows unknown prices, photos and Meridian-only sauna", as
   const { state } = await setup(page, context);
   await page.goto("/extras");
   await page.getByRole("button", { name: "Еда", exact: true }).click();
-  for (const name of [
-    "Фермерская корзина",
-    "Завтрак на двоих",
-    "Обед",
-    "Бургер",
-    "Ужин",
-  ])
+  for (const name of ["Фермерская корзина", "Завтрак на двоих", "Обед", "Ужин"])
     await expect(
       page.getByRole("heading", { name, exact: true }),
     ).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Выбрать:/ })).toHaveCount(4);
+  await expect(
+    page.getByRole("heading", { name: "Бургер", exact: true }),
+  ).toHaveCount(0);
   await page
-    .getByRole("button", { name: "Выбрать: Бургер", exact: true })
+    .getByRole("button", { name: "Выбрать: Ужин", exact: true })
     .click();
   await expect(
     page.getByRole("heading", { name: "Стоимость уточняется" }),
@@ -299,17 +297,17 @@ test("expanded catalog shows unknown prices, photos and Meridian-only sauna", as
   await expect(
     page.getByRole("button", { name: /Добавить в корзину/ }),
   ).toHaveCount(0);
-  const burgerPhoto = page.getByAltText(
-    "Бургер с фирменной булочкой Domingo Dacha",
+  const dinnerPhoto = page.getByAltText(
+    "Ужин: бургер с фирменной булочкой Domingo Dacha",
   );
-  await burgerPhoto.scrollIntoViewIfNeeded();
+  await dinnerPhoto.scrollIntoViewIfNeeded();
   await expect
     .poll(() =>
-      burgerPhoto.evaluate((image) => (image as HTMLImageElement).naturalWidth),
+      dinnerPhoto.evaluate((image) => (image as HTMLImageElement).naturalWidth),
     )
     .toBeGreaterThan(0);
   await page.screenshot({
-    path: testInfo.outputPath("burger.png"),
+    path: testInfo.outputPath("dinner.png"),
     fullPage: true,
   });
   await page.goto("/extras?view=service&service=bath-paradise");

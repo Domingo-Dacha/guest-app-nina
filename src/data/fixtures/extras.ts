@@ -100,7 +100,6 @@ export const extrasFixture: ExtrasCatalog = {
           "Продукты для неспешного загородного отдыха.",
         ],
         ["lunch", "Обед", "Продолжите день обедом в вашем доме."],
-        ["burger", "Бургер", "Бургер Domingo для вашего загородного отдыха."],
         ["dinner", "Ужин", "Соберитесь за столом после насыщенного дня."],
       ] as const
     ).map(([id, name, summary]) => ({
@@ -123,11 +122,11 @@ export const extrasFixture: ExtrasCatalog = {
                   alt: "Обед: паста с грибами и овощной салат",
                 },
               ]
-            : id === "burger"
+            : id === "dinner"
               ? [
                   {
                     src: "/images/extras/burger.jpg",
-                    alt: "Бургер с фирменной булочкой Domingo Dacha",
+                    alt: "Ужин: бургер с фирменной булочкой Domingo Dacha",
                   },
                 ]
               : undefined,
