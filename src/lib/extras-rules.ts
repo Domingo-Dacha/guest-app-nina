@@ -75,8 +75,8 @@ export function dateReason(
   catalog: ExtrasCatalog,
   now: Date,
 ): string | null {
-  const blocked = serviceBlockReason(service, stay);
-  if (blocked) return blocked;
+  if (!availableForStay(service, stay))
+    return "Эта услуга доступна только для гостей «Меридиана».";
   if (!date) return "Выберите дату.";
   if (date < stay.checkIn || date > stay.checkOut)
     return "Выберите дату в пределах проживания.";
@@ -133,6 +133,16 @@ export function validateSelection(
   now: Date,
 ): string | null {
   const service = serviceFor(catalog, item.serviceId);
+  const blocked = serviceBlockReason(service, stay);
+  if (blocked) return blocked;
+  if (
+    item.durationHours !== undefined &&
+    (!service.hourly ||
+      !Number.isInteger(item.durationHours) ||
+      item.durationHours < service.hourly.included ||
+      item.durationHours > service.hourly.max)
+  )
+    return "Проверьте длительность бани.";
   const days = item.durationDays ?? 1;
   if (
     (days !== 1 && days !== 2) ||
@@ -143,6 +153,20 @@ export function validateSelection(
     return "Для двух дней фурако выберите дату раньше: оба дня должны быть до дня выезда.";
   const reason = timeReason(service, item.date, item.time, stay, catalog, now);
   if (reason) return reason;
+  const hours = Math.max(
+    service.sessionHours ?? 0,
+    service.hourly ? (item.durationHours ?? service.hourly.included) : 0,
+  );
+  if (hours) {
+    const [hour, minute] = item.time.split(":").map(Number);
+    const finish = hour * 60 + minute + hours * 60;
+    const [outHour, outMinute] = stay.checkOutTime.split(":").map(Number);
+    if (
+      finish > 24 * 60 ||
+      (item.date === stay.checkOut && finish > outHour * 60 + outMinute)
+    )
+      return "Выберите более раннее время: услуга должна завершиться до конца дня и до выезда.";
+  }
   if (
     !Number.isInteger(item.quantity) ||
     item.quantity < 1 ||
@@ -170,11 +194,20 @@ export function pricedItem(item: Selection, catalog: ExtrasCatalog): CartItem {
     durationDays: item.durationDays ?? 1,
     fir: item.fir ?? false,
     robes: item.robes ?? 0,
+    durationHours: service.hourly
+      ? (item.durationHours ?? service.hourly.included)
+      : undefined,
     unitPrice:
-      service.durations?.find((d) => d.days === (item.durationDays ?? 1))
-        ?.price ??
-      service.price ??
-      0,
+      (service.priceByDate?.[item.date] ??
+        service.durations?.find((d) => d.days === (item.durationDays ?? 1))
+          ?.price ??
+        service.price ??
+        0) +
+      (service.hourly
+        ? ((item.durationHours ?? service.hourly.included) -
+            service.hourly.included) *
+          service.hourly.extraHourPrice
+        : 0),
     addonPrice: item.decoration ? (service.addon?.price ?? 0) : 0,
     firPrice: item.fir ? (service.firAddon?.price ?? 0) : 0,
     robePrice: item.robes ? (service.robeAddon?.price ?? 0) : 0,

@@ -75,6 +75,8 @@ export function ItemSummary({
         {item.serviceId === "furako" && (
           <>{(item.durationDays ?? 1) === 2 ? "2 дня" : "1 день"} · </>
         )}
+        {item.durationHours && <>Баня: {item.durationHours} ч · </>}
+        {service.sessionHours && <>Фурако: {service.sessionHours} ч · </>}
         {shortDate(item.date)} ·{" "}
         {confirmed
           ? "Подтверждённое время"

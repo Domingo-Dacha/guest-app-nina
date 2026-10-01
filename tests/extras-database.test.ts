@@ -63,11 +63,84 @@ beforeAll(async () => {
     await readFile("db/migrations/0003_extras_catalog.sql", "utf8"),
   );
   await db.exec(await readFile("db/migrations/0004_extras_burger.sql", "utf8"));
+  await db.exec(await readFile("db/migrations/0005_bath_packages.sql", "utf8"));
 }, 30000);
 afterAll(async () => {
   await db.close();
 });
 describe("extras PostgreSQL persistence (isolated, no server or external database)", () => {
+  it("persists bath package duration, robes and decoration together with firewood quantities", async () => {
+    const packageItem = {
+      id: randomUUID(),
+      serviceId: "bath-vensky-furako" as const,
+      date: "2026-10-17",
+      time: "16:00",
+      quantity: 1,
+      decoration: true,
+      robes: 2,
+      durationHours: 3,
+    };
+    await repo("package").execute(
+      { action: "save", version: 0, item: packageItem },
+      stay,
+      catalog,
+      now,
+    );
+    await repo("package").execute(
+      {
+        action: "save",
+        version: 1,
+        item: {
+          id: randomUUID(),
+          serviceId: "firewood",
+          date: "2026-10-17",
+          time: "По согласованию",
+          quantity: 2,
+          decoration: false,
+        },
+      },
+      stay,
+      catalog,
+      now,
+    );
+    const cart = await repo("package").getCart(stay);
+    expect(
+      cart.items.find((i) => i.serviceId === "bath-vensky-furako"),
+    ).toMatchObject({
+      durationHours: 3,
+      robes: 2,
+      unitPrice: 1550000,
+      addonPrice: 200000,
+      robePrice: 50000,
+    });
+    await repo("package").execute(
+      {
+        action: "checkout",
+        version: 2,
+        key: randomUUID(),
+        total: 2050000,
+        comment: "",
+      },
+      stay,
+      catalog,
+      now,
+    );
+    const [order] = await repo("package").listOrders(stay);
+    expect(order.total).toBe(2050000);
+    expect(
+      order.items.find((i) => i.serviceId === "bath-vensky-furako"),
+    ).toMatchObject({
+      durationHours: 3,
+      robes: 2,
+      decoration: true,
+      fulfillmentStatus: "awaiting_approval",
+    });
+    expect(order.items.find((i) => i.serviceId === "firewood")).toMatchObject({
+      quantity: 2,
+      unitPrice: 100000,
+    });
+    expect((await repo("package").getCart(stay)).items).toHaveLength(0);
+  });
   it("preserves historical order prices while migrating defaults for new options", async () => {
     const [order] = await repo("legacy").listOrders(stay);
     expect(order.total).toBe(600000);

@@ -34,6 +34,62 @@ const selection: Selection = {
 };
 const before = new Date("2026-10-16T14:59:59Z");
 describe("extras booking rules", () => {
+  it("prices bath extensions and extras, uses date tariffs, and rejects unsupported hours and overruns", () => {
+    const bath: Selection = {
+      ...selection,
+      serviceId: "bath-vensky",
+      time: "16:00",
+      durationHours: 3,
+      robes: 2,
+    };
+    expect(cartTotal([pricedItem(bath, catalog)])).toBe(1150000);
+    const special = structuredClone(catalog);
+    special.services.find((s) => s.id === "bath-vensky")!.priceByDate = {
+      "2026-10-17": 1000000,
+    };
+    expect(cartTotal([pricedItem(bath, special)])).toBe(1350000);
+    expect(pricesChanged([pricedItem(bath, catalog)], special)).toBe(true);
+    expect(validateSelection(bath, stay, catalog, before)).toBeNull();
+    expect(
+      validateSelection({ ...bath, durationHours: 13 }, stay, catalog, before),
+    ).toContain("длительность");
+    expect(
+      validateSelection(
+        { ...selection, durationHours: 3 },
+        stay,
+        catalog,
+        before,
+      ),
+    ).toContain("длительность");
+    expect(
+      validateSelection(
+        { ...bath, serviceId: "bath-vensky-furako", time: "21:00" },
+        stay,
+        catalog,
+        before,
+      ),
+    ).toContain("завершиться");
+    expect(
+      validateSelection(
+        { ...bath, date: stay.checkOut, time: "10:00" },
+        stay,
+        catalog,
+        before,
+      ),
+    ).toContain("завершиться");
+    const gavshino = serviceFor(catalog, "bath-gavshino");
+    expect(
+      timeReason(gavshino, bath.date, bath.time, stay, catalog, before),
+    ).toBeNull();
+    expect(
+      validateSelection(
+        { ...bath, serviceId: "bath-gavshino", durationHours: undefined },
+        stay,
+        catalog,
+        before,
+      ),
+    ).toContain("Стоимость уточняется");
+  });
   it("prices both furako days and independent optional extras without enabling them by default", () => {
     const bath: Selection = {
       ...selection,

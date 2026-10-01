@@ -327,7 +327,7 @@ test("expanded catalog shows unknown prices, photos and Meridian-only sauna", as
   await expect
     .poll(() =>
       page
-        .getByAltText("Интерьер парной с панорамным окном — общее фото бань")
+        .getByAltText("Интерьер: Баня «Венский»")
         .first()
         .evaluate((image) => (image as HTMLImageElement).naturalWidth),
     )
@@ -337,6 +337,71 @@ test("expanded catalog shows unknown prices, photos and Meridian-only sauna", as
   await expect(
     page.getByRole("heading", { name: "Райская баня" }),
   ).toBeVisible();
+});
+test("bath package preserves dates, hours and robes, and firewood keeps quantities", async ({
+  page,
+  context,
+}, testInfo) => {
+  test.setTimeout(60_000);
+  const { state } = await setup(page, context);
+  await page.goto("/extras?view=service&service=bath-vensky");
+  await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
+  await page.getByLabel("Желаемое время начала").selectOption("16:00");
+  await page.getByLabel("Длительность бани").selectOption("3");
+  await page.getByLabel(/Халаты/).selectOption("2");
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toContainText(/11\s*500/);
+  await page.getByRole("button", { name: /Добавить фурако на 4 часа/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "Баня «Венский» + фурако", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Дата", { exact: true })).toHaveValue(
+    "2026-10-17",
+  );
+  await expect(page.getByLabel("Желаемое время начала")).toHaveValue("16:00");
+  await expect(page.getByLabel("Длительность бани")).toHaveValue("3");
+  await expect(page.getByLabel(/Халаты/)).toHaveValue("2");
+  await page.getByRole("checkbox", { name: /Украшение в бочку/ }).check();
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toContainText(/18\s*500/);
+  await page.screenshot({
+    path: testInfo.outputPath("bath-package.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: /Добавить в корзину/ }).click();
+  await page
+    .getByRole("button", { name: "Выбрать: Дрова", exact: true })
+    .click();
+  await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
+  await page.getByLabel("Количество упаковок по 5 кг").selectOption("2");
+  await page.getByRole("button", { name: /Добавить в корзину/ }).click();
+  await openCheckout(page);
+  await page.getByRole("button", { name: "Перейти к демооплате" }).click();
+  await page.getByRole("button", { name: "Успешная демооплата" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Спасибо, заказ сохранён" }),
+  ).toBeVisible();
+  expect(state.orders[0].total).toBe(2050000);
+  await page.reload();
+  await expect(
+    page
+      .locator(".extras-item-summary")
+      .filter({ hasText: "Баня «Венский» + фурако" }),
+  ).toContainText("Баня: 3 ч");
+  await page.goto("/extras?view=service&service=bath-gavshino");
+  await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
+  await page.getByLabel("Желаемое время начала").selectOption("16:00");
+  await page.getByLabel(/Халаты/).selectOption("2");
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toHaveCount(0);
+  await expect(page.getByText(/выбор не отправляется/)).toBeVisible();
+  state.stay.houseName = "Меридиан";
+  await page.goto("/extras?view=service&service=bath-paradise");
+  await expect(page.getByLabel("Дата", { exact: true })).toBeVisible();
+  await expect(page.getByLabel(/Халаты/)).toBeVisible();
 });
 test("furako duration and optional extras survive cart editing and order reload", async ({
   page,
