@@ -9,6 +9,13 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+export {
+  extrasCarts,
+  extrasCartItems,
+  extrasOrders,
+  extrasOrderItems,
+} from "./extras-schema";
+
 export const guestRequests = pgTable(
   "guest_requests",
   {

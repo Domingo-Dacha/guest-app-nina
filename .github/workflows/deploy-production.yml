@@ -82,6 +82,11 @@ jobs:
           npx --yes vercel@60.1.3 build --prod
           --scope=domingo-dacha --token="$VERCEL_TOKEN"
 
+      - name: Apply test database migrations
+        run: >-
+          node --env-file=.vercel/.env.production.local
+          --import tsx scripts/migrate.ts
+
       - name: Publish production artifact
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TEAM_TOKEN }}
