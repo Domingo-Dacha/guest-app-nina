@@ -92,8 +92,8 @@ describe("staff dashboard persistence and authorization", () => {
     expect(food.transfers).toEqual([]);
     expect(sauna.transfers).toEqual([]);
     expect(food.tasks[0]).toMatchObject({
-      amount: 380000,
-      paidAmount: 380000,
+      amount: 180000,
+      paidAmount: 180000,
       quantity: 2,
       status: "new",
       comment: "Соус отдельно",
@@ -278,4 +278,55 @@ describe("staff dashboard persistence and authorization", () => {
       (await query("select count(*)::int as n from extras_orders"))[0].n,
     ).toBe(1);
   });
+});
+
+it("shows a paid future breakfast in all dates immediately and keeps dated views precise", async () => {
+  const order = await checkout();
+  expect(
+    (await staff().snapshot(kitchen, "2026-10-01", "2026-10-01")).tasks,
+  ).toEqual([]);
+  const all = await staff().snapshot(kitchen, null, null);
+  expect(all.tasks).toHaveLength(1);
+  expect(all.tasks[0]).toMatchObject({
+    orderId: order.id,
+    date: "2026-10-17",
+    quantity: 2,
+    servingsPerUnit: 1,
+    amount: 180000,
+    status: "new",
+  });
+  expect(
+    (await staff("another-team").snapshot(kitchen, null, null)).tasks,
+  ).toEqual([]);
+});
+
+it("preserves the price and portions of breakfast paid before the new tariff", async () => {
+  const order = await checkout();
+  await db.query(
+    "update extras_order_items set unit_price=190000,servings_per_unit=null where order_id=$1 and service_id='breakfast'",
+    [order.id],
+  );
+  await db.query("update extras_orders set total=1380000 where id=$1", [
+    order.id,
+  ]);
+  const task = (await staff().snapshot(kitchen, null, null)).tasks[0];
+  expect(task).toMatchObject({
+    quantity: 2,
+    servingsPerUnit: 2,
+    amount: 380000,
+    paidAmount: 380000,
+  });
+  await staff().execute(kitchen, {
+    action: "advance",
+    orderId: task.orderId,
+    id: task.id,
+    version: task.version,
+  });
+  const guestOrder = (
+    await new PostgresExtrasRepository(query, "nina").listOrders(stay)
+  )[0];
+  expect(guestOrder.total).toBe(1380000);
+  expect(
+    guestOrder.items.find((i) => i.serviceId === "breakfast"),
+  ).toMatchObject({ quantity: 2, servingsPerUnit: 2, unitPrice: 190000 });
 });

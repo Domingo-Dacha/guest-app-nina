@@ -308,14 +308,14 @@ describe("extras booking rules", () => {
   it("checks the deadline again at checkout and leaves the cart unchanged", () => {
     const items = [pricedItem(selection, catalog)];
     expect(() =>
-      validateCheckout(items, stay, catalog, 190000, before),
+      validateCheckout(items, stay, catalog, 90000, before),
     ).not.toThrow();
     expect(() =>
       validateCheckout(
         items,
         stay,
         catalog,
-        190000,
+        90000,
         new Date("2026-10-16T15:00:00Z"),
       ),
     ).toThrow("Приём заказов");
@@ -382,10 +382,10 @@ describe("extras booking rules", () => {
         pricedItem({ ...bath, decoration: true }, catalog),
         pricedItem(selection, catalog),
       ]),
-    ).toBe(1090000);
+    ).toBe(990000);
     expect(
       cartTotal([pricedItem({ ...selection, quantity: 2 }, catalog)]),
-    ).toBe(380000);
+    ).toBe(180000);
     expect(
       validateSelection({ ...bath, quantity: 2 }, stay, catalog, before),
     ).toContain("количество");

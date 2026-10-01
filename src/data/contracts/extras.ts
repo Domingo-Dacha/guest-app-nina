@@ -81,7 +81,7 @@ export const selectionSchema = z.object({
   serviceId: serviceIdSchema,
   date: z.iso.date(),
   time: z.string().min(1).max(20),
-  quantity: z.number().int().min(1).max(6),
+  quantity: z.number().int().min(1).max(12),
   decoration: z.boolean(),
   durationDays: z.union([z.literal(1), z.literal(2)]).optional(),
   fir: z.boolean().optional(),
@@ -91,6 +91,7 @@ export const selectionSchema = z.object({
 export type Selection = z.infer<typeof selectionSchema>;
 export type CartItem = Selection & {
   unitPrice: number;
+  servingsPerUnit?: number;
   addonPrice: number;
   firPrice?: number;
   robePrice?: number;

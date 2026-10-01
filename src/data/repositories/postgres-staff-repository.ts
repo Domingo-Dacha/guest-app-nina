@@ -44,6 +44,9 @@ function taskFromRow(row: Row): StaffTask {
     requestedTime: String(row.requested_time),
     confirmedTime: row.confirmed_time as string | null,
     quantity: Number(row.quantity),
+    servingsPerUnit: Number(
+      row.servings_per_unit ?? (serviceId === "breakfast" ? 2 : 1),
+    ),
     robes: Number(row.robes),
     decoration: Boolean(row.decoration),
     fir: Boolean(row.fir),
@@ -79,14 +82,18 @@ export class PostgresStaffRepository implements StaffRepository {
     private query: ExtrasQuery,
     private team: string,
   ) {}
-  async snapshot(profile: StaffProfile, from: string, to: string) {
+  async snapshot(
+    profile: StaffProfile,
+    from: string | null,
+    to: string | null,
+  ) {
     const rows = await this.query(
-      `select i.*, i.service_date::text as service_date, o.house_name,o.guests,o.comment,o.total as order_total,o.payment_status from extras_order_items i join extras_orders o on o.team_slug=i.team_slug and o.stay_id=i.stay_id and o.id=i.order_id where i.team_slug=$1 and i.service_date between $2::date and $3::date and ($4='manager' or ${departmentSql}=$4)`,
+      `select i.*, i.service_date::text as service_date, o.house_name,o.guests,o.comment,o.total as order_total,o.payment_status from extras_order_items i join extras_orders o on o.team_slug=i.team_slug and o.stay_id=i.stay_id and o.id=i.order_id where i.team_slug=$1 and ($2::date is null or i.service_date >= $2::date) and ($3::date is null or i.service_date <= $3::date) and ($4='manager' or ${departmentSql}=$4)`,
       [this.team, from, to, profile.role],
     );
     const tasks = rows.map(taskFromRow).sort(compareTasks);
     const events = await this.query(
-      `select e.* from staff_task_events e join extras_order_items i on i.team_slug=e.team_slug and i.stay_id=e.stay_id and i.order_id=e.order_id and i.id=e.item_id where i.team_slug=$1 and i.service_date between $2::date and $3::date and ($4='manager' or ${departmentSql}=$4) order by e.created_at,e.id`,
+      `select e.* from staff_task_events e join extras_order_items i on i.team_slug=e.team_slug and i.stay_id=e.stay_id and i.order_id=e.order_id and i.id=e.item_id where i.team_slug=$1 and ($2::date is null or i.service_date >= $2::date) and ($3::date is null or i.service_date <= $3::date) and ($4='manager' or ${departmentSql}=$4) order by e.created_at,e.id`,
       [this.team, from, to, profile.role],
     );
     for (const task of tasks)
@@ -102,7 +109,7 @@ export class PostgresStaffRepository implements StaffRepository {
     const transfers: TransferRecord[] = [];
     if (profile.role === "manager") {
       const finance = await this.query(
-        `select o.id,o.house_name,o.total,o.payment_status,r.status,r.version,r.booking_reference,r.record_reference,r.note,r.updated_by,r.updated_at from extras_orders o left join staff_transfer_records r on r.team_slug=o.team_slug and r.order_id=o.id where o.team_slug=$1 and exists (select 1 from extras_order_items i where i.team_slug=o.team_slug and i.stay_id=o.stay_id and i.order_id=o.id and i.service_date between $2::date and $3::date) order by o.created_at,o.id`,
+        `select o.id,o.house_name,o.total,o.payment_status,r.status,r.version,r.booking_reference,r.record_reference,r.note,r.updated_by,r.updated_at from extras_orders o left join staff_transfer_records r on r.team_slug=o.team_slug and r.order_id=o.id where o.team_slug=$1 and exists (select 1 from extras_order_items i where i.team_slug=o.team_slug and i.stay_id=o.stay_id and i.order_id=o.id and ($2::date is null or i.service_date >= $2::date) and ($3::date is null or i.service_date <= $3::date)) order by o.created_at,o.id`,
         [this.team, from, to],
       );
       for (const row of finance)

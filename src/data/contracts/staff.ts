@@ -30,6 +30,7 @@ export type StaffTask = {
   requestedTime: string;
   confirmedTime: string | null;
   quantity: number;
+  servingsPerUnit: number;
   robes: number;
   decoration: boolean;
   fir: boolean;
@@ -98,8 +99,8 @@ export type StaffMutation = Exclude<StaffCommand, { action: "profile" }>;
 export interface StaffRepository {
   snapshot(
     profile: StaffProfile,
-    from: string,
-    to: string,
+    from: string | null,
+    to: string | null,
   ): Promise<{ tasks: StaffTask[]; transfers: TransferRecord[] }>;
   execute(profile: StaffProfile, command: StaffMutation): Promise<void>;
 }

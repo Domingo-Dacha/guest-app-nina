@@ -101,3 +101,18 @@ describe("staff API boundaries", () => {
     expect(await result.text()).not.toContain("private");
   });
 });
+
+it("all-date browsing keeps server-side team and role scope while removing only date bounds", async () => {
+  mocks.profile.mockResolvedValue(staffProfiles[1]);
+  const result = await GET(
+    new Request("https://guest.test/api/staff?scope=all"),
+  );
+  expect(result.status).toBe(200);
+  expect(mocks.query).toHaveBeenCalledWith(expect.any(String), [
+    "nina",
+    null,
+    null,
+    "kitchen",
+  ]);
+  expect((await result.json()).transfers).toEqual([]);
+});

@@ -87,7 +87,7 @@ export function ItemSummary({
       </p>
       <p>
         {item.serviceId === "breakfast"
-          ? `${item.quantity} наб. × ${money(item.unitPrice)}`
+          ? `${item.quantity} ${(item.servingsPerUnit ?? 2) === 1 ? "чел." : "наб. на двоих"} × ${money(item.unitPrice)}`
           : item.quantity > 1
             ? `${item.quantity} шт. × ${money(item.unitPrice)}`
             : money(item.unitPrice)}

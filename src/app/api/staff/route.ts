@@ -30,6 +30,7 @@ export async function GET(request: Request) {
   if (!(await hasValidSession()))
     return json({ error: "Войдите с PIN команды." }, 401);
   const params = new URL(request.url).searchParams;
+  const allDates = params.get("scope") === "all";
   const range = z.object({ from: z.iso.date(), to: z.iso.date() }).safeParse({
     from: params.get("from") ?? moscowDate(new Date()),
     to: params.get("to") ?? params.get("from") ?? moscowDate(new Date()),
@@ -43,7 +44,11 @@ export async function GET(request: Request) {
   try {
     const profile = await getStaffProfile();
     const snapshot = profile
-      ? await repository().snapshot(profile, range.data.from, range.data.to)
+      ? await repository().snapshot(
+          profile,
+          allDates ? null : range.data.from,
+          allDates ? null : range.data.to,
+        )
       : { tasks: [], transfers: [] };
     return json({
       ...snapshot,

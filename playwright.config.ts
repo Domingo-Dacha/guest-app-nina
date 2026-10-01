@@ -12,7 +12,9 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: "npm run dev",
+    // CI exercises the published build; dev HMR/overlay and lazy-image loading
+    // can keep WebKit navigation pending even after the form is interactive.
+    command: process.env.CI ? "npm run build && npm run start" : "npm run dev",
     url: "http://localhost:3000/access",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
