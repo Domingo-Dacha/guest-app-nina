@@ -132,10 +132,17 @@ async function openCheckout(page: Page) {
 test("full extras journey keeps drafts, edits the cart, handles failed/cancelled payment and restores an order", async ({
   page,
   context,
-}) => {
+}, testInfo) => {
   const harness = await setup(page, context);
   await page.goto("/");
   await page.getByRole("link", { name: "Допуслуги", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Выбрать: Фурако", exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("catalog.png"),
+    fullPage: true,
+  });
   await page
     .getByRole("button", { name: "Баня и фурако", exact: true })
     .click();
@@ -157,6 +164,10 @@ test("full extras journey keeps drafts, edits the cart, handles failed/cancelled
     page.getByRole("checkbox", { name: /Украшение фурако/ }),
   ).not.toBeChecked();
   await page.getByRole("checkbox", { name: /Украшение фурако/ }).check();
+  await page.screenshot({
+    path: testInfo.outputPath("service.png"),
+    fullPage: true,
+  });
   await page.getByRole("button", { name: "Назад", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Баня и фурако", exact: true }),
@@ -174,11 +185,9 @@ test("full extras journey keeps drafts, edits the cart, handles failed/cancelled
   await page.getByRole("button", { name: "Все", exact: true }).click();
   await breakfast(page);
   await page.getByRole("button", { name: /^Корзина ·/ }).click();
-  const breakfastCard = page
-    .locator("article")
-    .filter({
-      has: page.getByRole("heading", { name: "Завтрак на двоих", exact: true }),
-    });
+  const breakfastCard = page.locator("article").filter({
+    has: page.getByRole("heading", { name: "Завтрак на двоих", exact: true }),
+  });
   await breakfastCard
     .getByRole("button", { name: "Изменить", exact: true })
     .click();
@@ -194,6 +203,10 @@ test("full extras journey keeps drafts, edits the cart, handles failed/cancelled
   await breakfast(page);
   await openCheckout(page);
   await page.getByLabel("Комментарий — необязательно").fill("Тест оформления");
+  await page.screenshot({
+    path: testInfo.outputPath("checkout.png"),
+    fullPage: true,
+  });
   await page.getByRole("button", { name: "Перейти к демооплате" }).click();
   await page.getByRole("button", { name: "Проверить ошибку оплаты" }).click();
   await expect(
@@ -227,6 +240,10 @@ test("full extras journey keeps drafts, edits the cart, handles failed/cancelled
   expect(harness.checkoutCalls()).toBe(1);
   expect(harness.state.orders[0].total).toBe(990000);
   expect(harness.state.cart.items).toHaveLength(0);
+  await page.screenshot({
+    path: testInfo.outputPath("result.png"),
+    fullPage: true,
+  });
   await page.reload();
   await expect(
     page.getByRole("heading", { name: "DG-TEST0001", exact: true }),
