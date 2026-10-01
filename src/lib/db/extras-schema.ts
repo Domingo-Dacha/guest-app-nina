@@ -14,6 +14,7 @@ import type {
   PaymentStatus,
   ServiceId,
 } from "@/data/contracts/extras";
+import type { WorkStatus } from "@/data/contracts/staff";
 
 const scope = () => ({
   teamSlug: text("team_slug").notNull(),
@@ -33,6 +34,7 @@ const selection = () => ({
   robes: integer("robes").notNull().default(0),
   firPrice: integer("fir_price").notNull().default(0),
   robePrice: integer("robe_price").notNull().default(0),
+  durationHours: integer("duration_hours"),
 });
 export const extrasCarts = pgTable(
   "extras_carts",
@@ -94,6 +96,11 @@ export const extrasOrderItems = pgTable(
     name: text("name").notNull(),
     addonName: text("addon_name"),
     confirmedTime: text("confirmed_time"),
+    workStatus: text("work_status")
+      .$type<WorkStatus>()
+      .notNull()
+      .default("new"),
+    staffVersion: integer("staff_version").notNull().default(0),
     fulfillmentStatus: text("fulfillment_status")
       .$type<FulfillmentStatus>()
       .notNull(),

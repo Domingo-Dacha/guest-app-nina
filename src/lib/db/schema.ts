@@ -15,6 +15,11 @@ export {
   extrasOrders,
   extrasOrderItems,
 } from "./extras-schema";
+export {
+  staffTaskEvents,
+  staffTransferRecords,
+  staffTransferEvents,
+} from "./staff-schema";
 
 export const guestRequests = pgTable(
   "guest_requests",
