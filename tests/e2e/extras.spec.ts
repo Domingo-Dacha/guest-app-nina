@@ -316,7 +316,7 @@ test("expanded catalog shows unknown prices, photos and Meridian-only sauna", as
   ).toBeVisible();
   await page.goto("/extras?category=bath");
   await expect(
-    page.getByRole("heading", { name: "Баня «Венский»" }),
+    page.getByRole("heading", { name: "Баня «Венский»", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Баня «Гавшино»" }),
