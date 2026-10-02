@@ -64,7 +64,12 @@ describe("extras booking rules", () => {
     ).toContain("длительность");
     expect(
       validateSelection(
-        { ...bath, serviceId: "bath-vensky-furako", time: "21:00" },
+        {
+          ...bath,
+          serviceId: "bath-vensky-furako",
+          durationHours: 4,
+          time: "21:00",
+        },
         stay,
         catalog,
         before,
@@ -90,6 +95,44 @@ describe("extras booking rules", () => {
         before,
       ),
     ).toBeNull();
+  });
+  it("includes four bath hours in the package and requires the current standalone furako price", () => {
+    const item: Selection = {
+      ...selection,
+      serviceId: "bath-vensky-furako",
+      time: "16:00",
+      durationHours: 4,
+    };
+    expect(validateSelection(item, stay, catalog, before)).toBeNull();
+    expect(pricedItem(item, catalog).unitPrice).toBe(1300000);
+    expect(pricedItem({ ...item, durationHours: 5 }, catalog).unitPrice).toBe(
+      1550000,
+    );
+    for (const durationHours of [2, 3]) {
+      const oldSelection = { ...item, durationHours };
+      expect(validateSelection(oldSelection, stay, catalog, before)).toContain(
+        "длительность",
+      );
+      expect(pricedItem(oldSelection, catalog).unitPrice).toBe(1300000);
+      expect(() =>
+        validateCheckout(
+          [pricedItem(oldSelection, catalog)],
+          stay,
+          catalog,
+          1300000,
+          before,
+        ),
+      ).toThrow("длительность");
+    }
+    const standalone = pricedItem(
+      { ...selection, serviceId: "furako-vensky", time: "16:00" },
+      catalog,
+    );
+    expect(standalone.unitPrice).toBe(700000);
+    const stalePrice = { ...standalone, unitPrice: 600000 };
+    expect(() =>
+      validateCheckout([stalePrice], stay, catalog, 600000, before),
+    ).toThrow("Цены изменились");
   });
   it("applies the annual New Year tariff only from Dec 31 through Jan 10", () => {
     for (const [date, expected] of [
@@ -193,7 +236,7 @@ describe("extras booking rules", () => {
           catalog,
         ),
       ]),
-    ).toBe(900000);
+    ).toBe(1000000);
   });
   it("prices both furako days and independent optional extras without enabling them by default", () => {
     const bath: Selection = {

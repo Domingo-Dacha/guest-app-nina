@@ -77,7 +77,7 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
     for (const [serviceId, total] of [
       ["bath-gavshino", 1100000],
       ["bath-paradise", 1350000],
-      ["furako-vensky", 700000],
+      ["furako-vensky", 800000],
     ] as const) {
       const repository = repo(serviceId);
       await repository.execute(
@@ -132,7 +132,7 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
       quantity: 1,
       decoration: true,
       robes: 2,
-      durationHours: 3,
+      durationHours: 5,
     };
     await repo("package").execute(
       { action: "save", version: 0, item: packageItem },
@@ -161,7 +161,7 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
     expect(
       cart.items.find((i) => i.serviceId === "bath-vensky-furako"),
     ).toMatchObject({
-      durationHours: 3,
+      durationHours: 5,
       robes: 2,
       unitPrice: 1550000,
       addonPrice: 200000,
@@ -184,7 +184,7 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
     expect(
       order.items.find((i) => i.serviceId === "bath-vensky-furako"),
     ).toMatchObject({
-      durationHours: 3,
+      durationHours: 5,
       robes: 2,
       decoration: true,
       fulfillmentStatus: "awaiting_approval",

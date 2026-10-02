@@ -26,7 +26,7 @@ const robeAddon = {
 const venskyDescription =
   "Уютная банька на краю посёлка у самой кромки леса. Тишина, приватность и единение с природой.\n\nКомфортно для 4 человек.\n\nВ парной дровяная печь, а на улице — бодрящая холодная купель, горячая бочка фурако и сенные качели для расслабления под открытым небом.";
 const venskyConditions =
-  "До бани не более 15 минут неспешной прогулки от домов Domingo Dacha в Венском Лесу и Нара Вилладж; от Игнатьево — около 15 минут на машине. Баня — 8 000 ₽ за 2 часа, с 31 декабря по 10 января включительно — 10 000 ₽, каждый следующий час — 2 500 ₽. Комплекс с фурако на 4 часа — 13 000 ₽, в новогодние праздники — 15 000 ₽. Отдельное фурако у бани — 6 000 ₽ за сеанс. Халаты и украшение бочки оплачиваются отдельно. Дату и время требуется подтвердить с менеджером.";
+  "До бани не более 15 минут неспешной прогулки от домов Domingo Dacha в Венском Лесу и Нара Вилладж; от Игнатьево — около 15 минут на машине. Баня — 8 000 ₽ за 2 часа, с 31 декабря по 10 января включительно — 10 000 ₽, каждый следующий час — 2 500 ₽. Комплекс: баня 4 часа + фурако 4 часа — 13 000 ₽, в новогодние праздники — 15 000 ₽. Отдельное фурако у бани — 7 000 ₽ за сеанс. Халаты и украшение бочки оплачиваются отдельно. Дату и время требуется подтвердить с менеджером.";
 
 export const extrasFixture: ExtrasCatalog = {
   categories: [
@@ -38,6 +38,33 @@ export const extrasFixture: ExtrasCatalog = {
   ],
   rules: { timeZone: "Europe/Moscow", breakfastDeadline: "18:00", maxSets: 6 },
   services: [
+    {
+      id: "farm-basket",
+      name: "Фермерская корзина",
+      category: "food",
+      summary: extrasCopy["farm-basket"],
+      description: extrasCopy["farm-basket"],
+      images: [
+        {
+          src: "/images/extras/farm-basket.jpg",
+          alt: "Фермерская корзина: молочные продукты, хлеб и сырники",
+        },
+      ],
+      includes: [
+        "Молоко — 1 л",
+        "Яйца — 10 шт.",
+        "Адыгейский козий сыр",
+        "Хлеб ржаной домашний",
+        "Подарок-сюрприз",
+      ],
+      conditions:
+        "Доставляем фермерскую корзину к вашему дому. Заказ оформляется у Марго в Telegram.",
+      telegramOrder: { username: "Margosch_ka" },
+      price: null,
+      unit: "",
+      confirmation: "manual",
+      times: [],
+    },
     {
       id: "breakfast",
       category: "food",
@@ -67,46 +94,23 @@ export const extrasFixture: ExtrasCatalog = {
       confirmation: "automatic",
       times: ["08:00–08:30", "09:00–09:30"],
     },
-    ...(
-      [
-        ["lunch", "Обед", extrasCopy["lunch"], extrasCopy["lunch"]],
-        ["dinner", "Ужин", extrasCopy["dinner"], extrasCopy["dinner"]],
-        [
-          "farm-basket",
-          "Фермерская корзина",
-          extrasCopy["farm-basket"],
-          extrasCopy["farm-basket"],
-        ],
-      ] as const
-    ).map(([id, name, summary, description]) => ({
+    ...(["lunch", "dinner"] as const).map((id) => ({
       id,
-      name,
-      summary,
+      name: id === "lunch" ? "Обед" : "Ужин",
+      summary: extrasCopy[id],
+      description: extrasCopy[id],
       category: "food" as const,
-      images:
-        id === "farm-basket"
-          ? [
-              {
-                src: "/images/extras/farm-basket.jpg",
-                alt: "Фермерская корзина: молочные продукты, хлеб и сырники",
-              },
-            ]
-          : id === "lunch"
-            ? [
-                {
-                  src: "/images/extras/lunch.jpg",
-                  alt: "Обед: паста с грибами и овощной салат",
-                },
-              ]
-            : id === "dinner"
-              ? [
-                  {
-                    src: "/images/extras/dinner-burger.jpg",
-                    alt: "Ужин: бургер с фирменной булочкой Domingo Dacha",
-                  },
-                ]
-              : undefined,
-      description,
+      images: [
+        id === "lunch"
+          ? {
+              src: "/images/extras/lunch.jpg",
+              alt: "Обед: паста с грибами и овощной салат",
+            }
+          : {
+              src: "/images/extras/dinner-burger.jpg",
+              alt: "Ужин: бургер с фирменной булочкой Domingo Dacha",
+            },
+      ],
       includes: [],
       conditions:
         "Состав, стоимость и условия заказа уточняются. Пока оформить эту услугу нельзя.",
@@ -114,20 +118,6 @@ export const extrasFixture: ExtrasCatalog = {
       unit: "",
       confirmation: "manual" as const,
       times: [],
-      ...(id === "farm-basket"
-        ? {
-            includes: [
-              "Молоко — 1 л",
-              "Яйца — 10 шт.",
-              "Адыгейский козий сыр",
-              "Хлеб ржаной домашний",
-              "Подарок-сюрприз",
-            ],
-            conditions:
-              "Доставляем фермерскую корзину к вашему дому. Заказ оформляется у Марго в Telegram.",
-            telegramOrder: { username: "Margosch_ka" },
-          }
-        : {}),
     })),
     {
       id: "furako",
@@ -151,7 +141,7 @@ export const extrasFixture: ExtrasCatalog = {
       ],
       images: [
         {
-          src: "/images/extras/furako-larch.jpg",
+          src: "/images/extras/furako-forest.png",
           alt: "Фурако на деревянной террасе среди деревьев",
         },
       ],
@@ -245,8 +235,8 @@ export const extrasFixture: ExtrasCatalog = {
         "Инструкция по поддержанию температуры",
       ],
       conditions:
-        "Фурако у бани — 6 000 ₽. Баня не входит в стоимость. Время и длительность согласовываются; халаты и украшение бочки можно добавить отдельно.",
-      price: 600000,
+        "Фурако у бани — 7 000 ₽. Баня не входит в стоимость. Время и длительность согласовываются; халаты и украшение бочки можно добавить отдельно.",
+      price: 700000,
       unit: "за сеанс",
       confirmation: "manual",
       times: bathTimes,
@@ -327,16 +317,16 @@ export const extrasFixture: ExtrasCatalog = {
       summary: "Парная и горячая купель в одном комплексе.",
       description: venskyDescription,
       includes: [
-        "Баня на 2 часа",
+        "Баня на 4 часа",
         "Фурако на 4 часа",
         "Дополнительные часы бани — по 2 500 ₽",
       ],
       conditions: venskyConditions,
       price: 1300000,
       newYearPrice: 1500000,
-      unit: "баня 2 часа + фурако 4 часа",
+      unit: "баня 4 часа + фурако 4 часа",
       confirmation: "manual",
-      hourly: { included: 2, extraHourPrice: 250000, max: 12 },
+      hourly: { included: 4, extraHourPrice: 250000, max: 12 },
       sessionHours: 4,
       times: bathTimes,
       robeAddon,
