@@ -101,7 +101,7 @@ export const extrasFixture: ExtrasCatalog = {
             : id === "dinner"
               ? [
                   {
-                    src: "/images/extras/burger.jpg",
+                    src: "/images/extras/dinner-burger.jpg",
                     alt: "Ужин: бургер с фирменной булочкой Domingo Dacha",
                   },
                 ]
