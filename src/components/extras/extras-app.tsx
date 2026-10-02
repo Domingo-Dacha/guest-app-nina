@@ -580,6 +580,10 @@ export function ExtrasApp(props: Props) {
                         ...draft,
                         id: draft.id || crypto.randomUUID(),
                         serviceId: target.id,
+                        durationHours: Math.max(
+                          draft.durationHours ?? 0,
+                          target.hourly?.included ?? 0,
+                        ),
                       },
                     }));
                     go("service", {
@@ -591,7 +595,15 @@ export function ExtrasApp(props: Props) {
                   Добавить фурако на 4 часа · +
                   {money(
                     pricedItem(
-                      { ...draft, serviceId: service.packageServiceId },
+                      {
+                        ...draft,
+                        serviceId: service.packageServiceId,
+                        durationHours: Math.max(
+                          draft.durationHours ?? 0,
+                          serviceFor(catalog, service.packageServiceId).hourly
+                            ?.included ?? 0,
+                        ),
+                      },
                       catalog,
                     ).unitPrice - pricedItem(draft, catalog).unitPrice,
                   )}

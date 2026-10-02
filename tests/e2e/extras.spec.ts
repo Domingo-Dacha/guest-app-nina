@@ -355,6 +355,9 @@ test("bath package preserves dates, hours and robes, and firewood keeps quantiti
   await expect(
     page.getByRole("button", { name: /Добавить в корзину/ }),
   ).toContainText(/11\s*500/);
+  await expect(
+    page.getByRole("button", { name: /Добавить фурако на 4 часа/ }),
+  ).toContainText(/2\s*500/);
   await page.getByRole("button", { name: /Добавить фурако на 4 часа/ }).click();
   await expect(
     page.getByRole("heading", { name: "Баня «Венский» + фурако", exact: true }),
@@ -363,12 +366,25 @@ test("bath package preserves dates, hours and robes, and firewood keeps quantiti
     "2026-10-17",
   );
   await expect(page.getByLabel("Желаемое время начала")).toHaveValue("16:00");
-  await expect(page.getByLabel("Длительность бани")).toHaveValue("3");
+  await expect(page.getByLabel("Длительность бани")).toHaveValue("4");
   await expect(page.getByLabel(/Халаты/)).toHaveValue("2");
   await page.getByRole("checkbox", { name: /Украшение в бочку/ }).check();
   await expect(
     page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toContainText(/16\s*000/);
+  await expect(page.locator(".extras-base-price")).toContainText(
+    "баня 4 ч + фурако 4 ч",
+  );
+  await expect(
+    page
+      .getByLabel("Длительность бани")
+      .locator('option[value="2"], option[value="3"]'),
+  ).toHaveCount(0);
+  await page.getByLabel("Длительность бани").selectOption("5");
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
   ).toContainText(/18\s*500/);
+  await page.getByLabel("Длительность бани").selectOption("4");
   await page.screenshot({
     path: testInfo.outputPath("bath-package.png"),
     fullPage: true,
@@ -386,13 +402,13 @@ test("bath package preserves dates, hours and robes, and firewood keeps quantiti
   await expect(
     page.getByRole("heading", { name: "Спасибо, заказ сохранён" }),
   ).toBeVisible();
-  expect(state.orders[0].total).toBe(2050000);
+  expect(state.orders[0].total).toBe(1800000);
   await page.reload();
   await expect(
     page
       .locator(".extras-item-summary")
       .filter({ hasText: "Баня «Венский» + фурако" }),
-  ).toContainText("Баня: 3 ч");
+  ).toContainText("Баня: 4 ч");
   await page.goto("/extras?view=service&service=bath-gavshino");
   await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
   await page.getByLabel("Желаемое время начала").selectOption("16:00");
@@ -413,7 +429,7 @@ test("bath package preserves dates, hours and robes, and firewood keeps quantiti
     page.getByRole("button", { name: /Добавить в корзину/ }),
   ).toContainText(/13\s*500/);
 });
-test("New Year tariffs follow the selected date and separate sauna furako costs 6000", async ({
+test("New Year tariffs follow the selected date and separate sauna furako costs 7000", async ({
   page,
   context,
 }, testInfo) => {
@@ -446,7 +462,7 @@ test("New Year tariffs follow the selected date and separate sauna furako costs 
   await page.getByLabel("Желаемое время начала").selectOption("16:00");
   await expect(
     page.getByRole("button", { name: /Добавить в корзину/ }),
-  ).toContainText(/6\s*000/);
+  ).toContainText(/7\s*000/);
   await page.screenshot({
     path: testInfo.outputPath("separate-furako.png"),
     fullPage: true,
@@ -454,7 +470,7 @@ test("New Year tariffs follow the selected date and separate sauna furako costs 
   await page.getByRole("button", { name: /Добавить в корзину/ }).click();
   expect(state.cart.items[0]).toMatchObject({
     serviceId: "furako-vensky",
-    unitPrice: 600000,
+    unitPrice: 700000,
   });
 });
 test("furako duration and optional extras survive cart editing and order reload", async ({
@@ -665,10 +681,10 @@ test("guest copy, service order and empty-category links stay consistent", async
   ];
   await page.goto("/extras");
   await expect(page.locator(".extras-service-card h2")).toHaveText([
+    "Фермерская корзина",
     "Завтрак",
     "Обед",
     "Ужин",
-    "Фермерская корзина",
     "Бочка фурако",
     "Сапы",
     "Поздний выезд",
@@ -742,7 +758,7 @@ test("guest copy, service order and empty-category links stay consistent", async
     page.getByRole("button", { name: "Все", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".extras-service-card").first()).toContainText(
-    "Завтрак",
+    "Фермерская корзина",
   );
   await page.goto("/");
   await expect(

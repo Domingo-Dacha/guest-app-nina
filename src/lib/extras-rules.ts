@@ -233,9 +233,11 @@ export function pricedItem(item: Selection, catalog: ExtrasCatalog): CartItem {
         service.price ??
         0) +
       (service.hourly
-        ? ((item.durationHours ?? service.hourly.included) -
-            service.hourly.included) *
-          service.hourly.extraHourPrice
+        ? Math.max(
+            0,
+            (item.durationHours ?? service.hourly.included) -
+              service.hourly.included,
+          ) * service.hourly.extraHourPrice
         : 0),
     addonPrice: item.decoration ? (service.addon?.price ?? 0) : 0,
     firPrice: item.fir ? (service.firAddon?.price ?? 0) : 0,
