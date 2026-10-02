@@ -120,7 +120,8 @@ async function breakfast(page: Page) {
     .getByRole("button", { name: "Выбрать: Завтрак", exact: true })
     .click();
   await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
-  await page.getByLabel("Интервал доставки").selectOption("09:00–09:30");
+  await expect(page.getByLabel("Интервал доставки")).toHaveCount(0);
+  await expect(page.getByText("Доставка: 08:00–10:00").first()).toBeVisible();
   await page.getByRole("button", { name: /Добавить в корзину/ }).click();
   await expect(
     page.getByRole("heading", { name: "Допуслуги", exact: true }),
@@ -204,7 +205,7 @@ test("full extras journey keeps drafts, edits the cart, handles failed/cancelled
   await breakfastCard
     .getByRole("button", { name: "Изменить", exact: true })
     .click();
-  await expect(page.getByLabel("Интервал доставки")).toHaveValue("09:00–09:30");
+  await expect(page.getByLabel("Интервал доставки")).toHaveCount(0);
   await page.getByLabel("Количество человек").selectOption("2");
   await page.getByRole("button", { name: /Сохранить изменения/ }).click();
   await expect(breakfastCard).toContainText(/2 чел/);
@@ -356,18 +357,16 @@ test("bath package preserves dates, hours and robes, and firewood keeps quantiti
     page.getByRole("button", { name: /Добавить в корзину/ }),
   ).toContainText(/11\s*500/);
   await expect(
-    page.getByRole("button", { name: /Добавить фурако на 4 часа/ }),
-  ).toContainText(/2\s*500/);
-  await page.getByRole("button", { name: /Добавить фурако на 4 часа/ }).click();
-  await expect(
-    page.getByRole("heading", { name: "Баня «Венский» + фурако", exact: true }),
-  ).toBeVisible();
-  await expect(page.getByLabel("Дата", { exact: true })).toHaveValue(
-    "2026-10-17",
-  );
-  await expect(page.getByLabel("Желаемое время начала")).toHaveValue("16:00");
-  await expect(page.getByLabel("Длительность бани")).toHaveValue("4");
-  await expect(page.getByLabel(/Халаты/)).toHaveValue("2");
+    page.getByRole("button", { name: /Добавить фурако/ }),
+  ).toHaveCount(0);
+  await expect(page.locator(".extras-detail-copy")).not.toContainText("фурако");
+  await page.goto("/extras?view=service&service=bath-vensky-furako", {
+    waitUntil: "domcontentloaded",
+  });
+  await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
+  await page.getByLabel("Желаемое время начала").selectOption("16:00");
+  await expect(page.getByLabel("Длительность бани")).toHaveCount(0);
+  await page.getByLabel(/Халаты/).selectOption("2");
   await page.getByRole("checkbox", { name: /Украшение в бочку/ }).check();
   await expect(
     page.getByRole("button", { name: /Добавить в корзину/ }),
@@ -375,16 +374,6 @@ test("bath package preserves dates, hours and robes, and firewood keeps quantiti
   await expect(page.locator(".extras-base-price")).toContainText(
     "баня 4 ч + фурако 4 ч",
   );
-  await expect(
-    page
-      .getByLabel("Длительность бани")
-      .locator('option[value="2"], option[value="3"]'),
-  ).toHaveCount(0);
-  await page.getByLabel("Длительность бани").selectOption("5");
-  await expect(
-    page.getByRole("button", { name: /Добавить в корзину/ }),
-  ).toContainText(/18\s*500/);
-  await page.getByLabel("Длительность бани").selectOption("4");
   await page.screenshot({
     path: testInfo.outputPath("bath-package.png"),
     fullPage: true,
@@ -449,7 +438,11 @@ test("New Year tariffs follow the selected date and separate sauna furako costs 
     page.getByRole("button", { name: /Добавить в корзину/ }),
   ).toContainText(/10\s*000/);
   await expect(page.getByText(/Применён новогодний тариф/)).toBeVisible();
-  await page.getByRole("button", { name: /Добавить фурако на 4 часа/ }).click();
+  await page.goto("/extras?view=service&service=bath-vensky-furako", {
+    waitUntil: "domcontentloaded",
+  });
+  await page.getByLabel("Дата", { exact: true }).selectOption("2026-12-31");
+  await page.getByLabel("Желаемое время начала").selectOption("16:00");
   await expect(
     page.getByRole("button", { name: /Добавить в корзину/ }),
   ).toContainText(/15\s*000/);
@@ -688,12 +681,24 @@ test("guest copy, service order and empty-category links stay consistent", async
     "Бочка фурако",
     "Сапы",
     "Поздний выезд",
-    "Фурако у бани «Венский»",
     "Баня «Венский»",
-    "Баня «Гавшино»",
     "Баня «Венский» + фурако",
+    "Баня «Гавшино»",
+    "Фурако у бани «Венский»",
+    "Халат",
     "Дрова",
   ]);
+  for (const [name, window] of [
+    ["Завтрак", "08:00–10:00"],
+    ["Обед", "13:00–15:00"],
+    ["Ужин", "18:00–20:00"],
+  ]) {
+    const meal = page
+      .locator(".extras-service-card")
+      .filter({ has: page.getByRole("heading", { name, exact: true }) });
+    await expect(meal).toContainText(`Доставка: ${window}`);
+    await expect(meal).not.toContainText("Время по согласованию");
+  }
   for (const [, name, description] of copy) {
     const card = page
       .locator(".extras-service-card")
@@ -713,9 +718,9 @@ test("guest copy, service order and empty-category links stay consistent", async
     await page
       .getByRole("button", { name: `Выбрать: ${name}`, exact: true })
       .click();
-    await expect(page.locator(".extras-detail-copy > p")).toHaveText(
-      description,
-    );
+    await expect(
+      page.locator(".extras-detail-copy > p:not(.extras-note)"),
+    ).toHaveText(description);
     const widths = await page.evaluate(() => [
       document.documentElement.scrollWidth,
       document.documentElement.clientWidth,
@@ -777,7 +782,8 @@ test("breakfast costs 900 per person through checkout and order history", async 
     "за 1 человека",
   );
   await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
-  await page.getByLabel("Интервал доставки").selectOption("09:00–09:30");
+  await expect(page.getByLabel("Интервал доставки")).toHaveCount(0);
+  await expect(page.getByText("Доставка: 08:00–10:00").first()).toBeVisible();
   await page.getByLabel("Количество человек").selectOption("3");
   await expect(
     page.getByRole("button", { name: /Добавить в корзину/ }),
@@ -817,7 +823,7 @@ test("legacy breakfast cart requires confirmation and keeps four portions when s
             id: randomUUID(),
             serviceId: "breakfast",
             date: "2026-10-17",
-            time: "09:00–09:30",
+            time: "08:00–10:00",
             quantity: 2,
             decoration: false,
           },
@@ -855,4 +861,39 @@ test("legacy breakfast cart requires confirmation and keeps four portions when s
     page.getByRole("heading", { name: "Спасибо, заказ сохранён" }),
   ).toBeVisible();
   expect(state.orders[0].total).toBe(360000);
+});
+
+test("standalone robes are ordered from Comfort without a bath", async ({
+  page,
+  context,
+}, testInfo) => {
+  const { state } = await setup(page, context);
+  await page.goto("/extras?category=comfort");
+  await page
+    .getByRole("button", { name: "Выбрать: Халат", exact: true })
+    .click();
+  await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
+  await page.getByLabel("Количество халатов").selectOption("2");
+  await expect(
+    page.getByRole("button", { name: /Добавить в корзину/ }),
+  ).toContainText(/1\s*000/);
+  await page.screenshot({
+    path: testInfo.outputPath("standalone-robes.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: /Добавить в корзину/ }).click();
+  await openCheckout(page);
+  await page.getByRole("button", { name: "Перейти к демооплате" }).click();
+  await page.getByRole("button", { name: "Успешная демооплата" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Спасибо, заказ сохранён" }),
+  ).toBeVisible();
+  expect(state.orders[0].items).toHaveLength(1);
+  expect(state.orders[0].items[0]).toMatchObject({
+    serviceId: "robe",
+    quantity: 2,
+    unitPrice: 50000,
+  });
+  await page.reload();
+  await expect(page.locator(".extras-item-summary")).toContainText("Халат");
 });

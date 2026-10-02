@@ -41,7 +41,7 @@ async function checkout(team = "nina") {
           id: randomUUID(),
           serviceId,
           date: "2026-10-17",
-          time: serviceId === "breakfast" ? "09:00–09:30" : "19:00",
+          time: serviceId === "breakfast" ? "08:00–10:00" : "19:00",
           quantity: serviceId === "breakfast" ? 2 : 1,
           decoration: serviceId === "furako",
           robes: serviceId === "furako" ? 2 : 0,
@@ -79,6 +79,47 @@ afterAll(async () => {
   await db.close();
 });
 describe("staff dashboard persistence and authorization", () => {
+  it("routes a standalone robe order to Service rather than Bath", async () => {
+    const guest = new PostgresExtrasRepository(query, "nina");
+    await guest.execute(
+      {
+        action: "save",
+        version: 0,
+        item: {
+          id: randomUUID(),
+          serviceId: "robe",
+          date: "2026-10-17",
+          time: "По согласованию",
+          quantity: 2,
+          decoration: false,
+        },
+      },
+      stay,
+      extrasFixture,
+      now,
+    );
+    await guest.execute(
+      {
+        action: "checkout",
+        version: 1,
+        total: 100000,
+        key: randomUUID(),
+        comment: "",
+      },
+      stay,
+      extrasFixture,
+      now,
+    );
+    const tasks = (await snapshot(staffProfiles[3])).tasks;
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]).toMatchObject({
+      serviceId: "robe",
+      quantity: 2,
+      amount: 100000,
+    });
+    expect((await snapshot(bath)).tasks).toHaveLength(0);
+    expect((await snapshot(kitchen)).tasks).toHaveLength(0);
+  });
   it("splits mixed orders by direction and isolates teams, finances and amounts", async () => {
     const order = await checkout();
     await checkout("other");

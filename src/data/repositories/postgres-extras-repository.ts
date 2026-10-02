@@ -176,7 +176,7 @@ export class PostgresExtrasRepository implements ExtrasRepository {
     } else if (command.action === "reprice") {
       const prices = cart.items.map((i) => repriceItem(i, catalog));
       result = await this.query(
-        `${gate}, updated as (update extras_cart_items i set quantity=p.quantity,servings_per_unit=p."servingsPerUnit",unit_price=p."unitPrice",addon_price=p."addonPrice",fir_price=p."firPrice",robe_price=p."robePrice" from gate g, jsonb_to_recordset($4::jsonb) as p(id uuid,quantity integer,"servingsPerUnit" integer,"unitPrice" integer,"addonPrice" integer,"firPrice" integer,"robePrice" integer) where i.team_slug=g.team_slug and i.stay_id=g.stay_id and i.id=p.id returning i.id) select * from gate`,
+        `${gate}, updated as (update extras_cart_items i set requested_time=p.time,duration_hours=p."durationHours",quantity=p.quantity,servings_per_unit=p."servingsPerUnit",unit_price=p."unitPrice",addon_price=p."addonPrice",fir_price=p."firPrice",robe_price=p."robePrice" from gate g, jsonb_to_recordset($4::jsonb) as p(id uuid,time text,"durationHours" integer,quantity integer,"servingsPerUnit" integer,"unitPrice" integer,"addonPrice" integer,"firPrice" integer,"robePrice" integer) where i.team_slug=g.team_slug and i.stay_id=g.stay_id and i.id=p.id returning i.id) select * from gate`,
         [...scope, JSON.stringify(prices)],
       );
     } else {

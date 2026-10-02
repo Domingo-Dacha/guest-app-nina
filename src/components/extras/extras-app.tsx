@@ -82,7 +82,7 @@ export function ExtrasApp(props: Props) {
         id: "",
         serviceId: service.id,
         date: service.id === "late-checkout" ? stay.checkOut : "",
-        time: "",
+        time: service.deliveryWindow ?? "",
         quantity: 1,
         decoration: false,
         durationDays: 1,
@@ -388,11 +388,13 @@ export function ExtrasApp(props: Props) {
                     <h2>{s.name}</h2>
                     <p>{s.summary}</p>
                     <p className="extras-note">
-                      {s.telegramOrder
-                        ? "Доставка от фермы «МАРГО»"
-                        : s.confirmation === "manual"
-                          ? "Время по согласованию"
-                          : "Заказ до 18:00 накануне"}
+                      {s.deliveryWindow
+                        ? `Доставка: ${s.deliveryWindow}`
+                        : s.telegramOrder
+                          ? "Доставка от фермы «МАРГО»"
+                          : s.confirmation === "manual"
+                            ? "Время по согласованию"
+                            : "Заказ до 18:00 накануне"}
                     </p>
                     <div className="extras-card-action">
                       {!s.telegramOrder && (
@@ -447,6 +449,11 @@ export function ExtrasApp(props: Props) {
               {service.description.split("\n\n").map((paragraph) => (
                 <p key={paragraph}>{paragraph}</p>
               ))}
+              {service.deliveryWindow && (
+                <p className="extras-note">
+                  Доставка: {service.deliveryWindow}
+                </p>
+              )}
               {service.includes.length > 0 && <h2>Что входит</h2>}
               <ul>
                 {service.includes.map((text) => (
@@ -535,35 +542,39 @@ export function ExtrasApp(props: Props) {
                   .
                 </p>
               )}
-              {service.hourly && (
-                <>
-                  <label htmlFor="extra-hours">Длительность бани</label>
-                  <select
-                    id="extra-hours"
-                    value={draft.durationHours ?? service.hourly.included}
-                    disabled={busy}
-                    onChange={(event) =>
-                      updateDraft({ durationHours: Number(event.target.value) })
-                    }
-                  >
-                    {Array.from(
-                      {
-                        length:
-                          service.hourly.max - service.hourly.included + 1,
-                      },
-                      (_, n) => n + service.hourly!.included,
-                    ).map((hours) => (
-                      <option key={hours} value={hours}>
-                        {hours} ч
-                      </option>
-                    ))}
-                  </select>
-                  <p className="extras-note">
-                    Включено {service.hourly.included} ч; каждый дополнительный
-                    час — {money(service.hourly.extraHourPrice)}.
-                  </p>
-                </>
-              )}
+              {service.hourly &&
+                service.hourly.max > service.hourly.included && (
+                  <>
+                    <label htmlFor="extra-hours">Длительность бани</label>
+                    <select
+                      id="extra-hours"
+                      value={draft.durationHours ?? service.hourly.included}
+                      disabled={busy}
+                      onChange={(event) =>
+                        updateDraft({
+                          durationHours: Number(event.target.value),
+                        })
+                      }
+                    >
+                      {Array.from(
+                        {
+                          length:
+                            service.hourly.max - service.hourly.included + 1,
+                        },
+                        (_, n) => n + service.hourly!.included,
+                      ).map((hours) => (
+                        <option key={hours} value={hours}>
+                          {hours} ч
+                        </option>
+                      ))}
+                    </select>
+                    <p className="extras-note">
+                      Включено {service.hourly.included} ч; каждый
+                      дополнительный час —{" "}
+                      {money(service.hourly.extraHourPrice)}.
+                    </p>
+                  </>
+                )}
               {service.packageServiceId && (
                 <Button
                   type="button"
@@ -645,7 +656,8 @@ export function ExtrasApp(props: Props) {
                   updateDraft({
                     date: event.target.value,
                     time:
-                      service.timing === "agreement" ? "По согласованию" : "",
+                      service.deliveryWindow ??
+                      (service.timing === "agreement" ? "По согласованию" : ""),
                   })
                 }
               >
@@ -678,7 +690,11 @@ export function ExtrasApp(props: Props) {
                   позднее время.
                 </p>
               )}
-              {service.timing === "agreement" ? (
+              {service.deliveryWindow ? (
+                <p className="extras-note">
+                  Доставка: {service.deliveryWindow}
+                </p>
+              ) : service.timing === "agreement" ? (
                 <p className="extras-note">
                   Время и длительность — по согласованию.
                 </p>

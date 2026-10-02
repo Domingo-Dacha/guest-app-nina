@@ -203,9 +203,15 @@ export const breakfastPortions = (
   item: Pick<CartItem, "quantity" | "servingsPerUnit">,
 ) => item.quantity * (item.servingsPerUnit ?? 2);
 export function repriceItem(item: CartItem, catalog: ExtrasCatalog): CartItem {
+  const service = serviceFor(catalog, item.serviceId);
   return pricedItem(
     {
       ...item,
+      time: service.deliveryWindow ?? item.time,
+      durationHours:
+        service.hourly?.max === service.hourly?.included && service.hourly
+          ? service.hourly.included
+          : item.durationHours,
       quantity:
         item.serviceId === "breakfast"
           ? breakfastPortions(item)
@@ -254,6 +260,8 @@ export function pricesChanged(items: CartItem[], catalog: ExtrasCatalog) {
     const current = repriceItem(item, catalog);
     return (
       current.quantity !== item.quantity ||
+      current.time !== item.time ||
+      current.durationHours !== item.durationHours ||
       (item.serviceId === "breakfast" &&
         current.servingsPerUnit !== item.servingsPerUnit) ||
       current.unitPrice !== item.unitPrice ||

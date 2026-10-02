@@ -16,6 +16,7 @@ export const serviceIdSchema = z.enum([
   "sup",
   "bicycles",
   "firewood",
+  "robe",
 ]);
 export type ServiceId = z.infer<typeof serviceIdSchema>;
 export type CategoryId =
@@ -47,6 +48,7 @@ export type ExtraService = {
   unit: string;
   confirmation: "automatic" | "manual";
   times: string[];
+  deliveryWindow?: string;
   retired?: boolean;
   telegramOrder?: { username: string };
   addon?: {
