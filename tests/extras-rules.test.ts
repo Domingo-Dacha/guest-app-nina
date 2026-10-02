@@ -6,6 +6,7 @@ import {
   dateReason,
   pricedItem,
   pricesChanged,
+  repriceItem,
   serviceFor,
   timeReason,
   validateCheckout,
@@ -29,7 +30,7 @@ const selection: Selection = {
   id: "10000000-0000-4000-8000-000000000001",
   serviceId: "breakfast",
   date: "2026-10-17",
-  time: "09:00–09:30",
+  time: "08:00–10:00",
   quantity: 1,
   decoration: false,
 };
@@ -105,10 +106,7 @@ describe("extras booking rules", () => {
     };
     expect(validateSelection(item, stay, catalog, before)).toBeNull();
     expect(pricedItem(item, catalog).unitPrice).toBe(1300000);
-    expect(pricedItem({ ...item, durationHours: 5 }, catalog).unitPrice).toBe(
-      1550000,
-    );
-    for (const durationHours of [2, 3]) {
+    for (const durationHours of [2, 3, 5]) {
       const oldSelection = { ...item, durationHours };
       expect(validateSelection(oldSelection, stay, catalog, before)).toContain(
         "длительность",
@@ -133,6 +131,28 @@ describe("extras booking rules", () => {
     expect(() =>
       validateCheckout([stalePrice], stay, catalog, 600000, before),
     ).toThrow("Цены изменились");
+  });
+  it("updates unpaid delivery windows and fixed package hours without mutating stored items", () => {
+    const oldBreakfast = {
+      ...pricedItem(selection, catalog),
+      time: "09:00–09:30",
+    };
+    expect(pricesChanged([oldBreakfast], catalog)).toBe(true);
+    expect(repriceItem(oldBreakfast, catalog).time).toBe("08:00–10:00");
+    expect(oldBreakfast.time).toBe("09:00–09:30");
+    const oldPackage = {
+      ...pricedItem(
+        { ...selection, serviceId: "bath-vensky-furako", time: "16:00" },
+        catalog,
+      ),
+      durationHours: 5,
+      unitPrice: 1550000,
+    };
+    expect(repriceItem(oldPackage, catalog)).toMatchObject({
+      durationHours: 4,
+      unitPrice: 1300000,
+    });
+    expect(oldPackage.durationHours).toBe(5);
   });
   it("applies the annual New Year tariff only from Dec 31 through Jan 10", () => {
     for (const [date, expected] of [

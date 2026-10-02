@@ -26,7 +26,7 @@ const robeAddon = {
 const venskyDescription =
   "Уютная банька на краю посёлка у самой кромки леса. Тишина, приватность и единение с природой.\n\nКомфортно для 4 человек.\n\nВ парной дровяная печь, а на улице — бодрящая холодная купель, горячая бочка фурако и сенные качели для расслабления под открытым небом.";
 const venskyConditions =
-  "До бани не более 15 минут неспешной прогулки от домов Domingo Dacha в Венском Лесу и Нара Вилладж; от Игнатьево — около 15 минут на машине. Баня — 8 000 ₽ за 2 часа, с 31 декабря по 10 января включительно — 10 000 ₽, каждый следующий час — 2 500 ₽. Комплекс: баня 4 часа + фурако 4 часа — 13 000 ₽, в новогодние праздники — 15 000 ₽. Отдельное фурако у бани — 7 000 ₽ за сеанс. Халаты и украшение бочки оплачиваются отдельно. Дату и время требуется подтвердить с менеджером.";
+  "До комплекса не более 15 минут неспешной прогулки от домов Domingo Dacha в Венском Лесу и Нара Вилладж; от Игнатьево — около 15 минут на машине. В комплекс включены 4 часа бани и 4 часа фурако — 13 000 ₽, с 31 декабря по 10 января включительно — 15 000 ₽. Длительность комплекса фиксирована. Халаты и украшение бочки оплачиваются отдельно. Дату и время требуется подтвердить с менеджером.";
 
 export const extrasFixture: ExtrasCatalog = {
   categories: [
@@ -92,13 +92,15 @@ export const extrasFixture: ExtrasCatalog = {
         },
       ],
       confirmation: "automatic",
-      times: ["08:00–08:30", "09:00–09:30"],
+      times: ["08:00–10:00"],
+      deliveryWindow: "08:00–10:00",
     },
     ...(["lunch", "dinner"] as const).map((id) => ({
       id,
       name: id === "lunch" ? "Обед" : "Ужин",
       summary: extrasCopy[id],
       description: extrasCopy[id],
+      deliveryWindow: id === "lunch" ? "13:00–15:00" : "18:00–20:00",
       category: "food" as const,
       images: [
         id === "lunch"
@@ -223,32 +225,6 @@ export const extrasFixture: ExtrasCatalog = {
       confirmation: "manual",
       times: ["13:00", "14:00", "15:00", "16:00", "17:00", "18:00"],
     },
-    {
-      id: "furako-vensky",
-      category: "bath",
-      name: "Фурако у бани «Венский»",
-      summary: "Горячая бочка у бани — отдельный сеанс отдыха.",
-      description: furakoDescription,
-      includes: [
-        "Подготовка купели и свежая вода",
-        "Растопка к согласованному времени",
-        "Инструкция по поддержанию температуры",
-      ],
-      conditions:
-        "Фурако у бани — 7 000 ₽. Баня не входит в стоимость. Время и длительность согласовываются; халаты и украшение бочки можно добавить отдельно.",
-      price: 700000,
-      unit: "за сеанс",
-      confirmation: "manual",
-      times: bathTimes,
-      robeAddon,
-      addon: decorationAddon,
-      images: [
-        {
-          src: "/images/extras/furako-larch.jpg",
-          alt: "Бочка фурако у бани «Венский»",
-        },
-      ],
-    },
     ...(
       [
         [
@@ -270,78 +246,115 @@ export const extrasFixture: ExtrasCatalog = {
           "Райская баня доступна только гостям «Меридиана» и может стать особой частью вашего проживания. Посвятите этот вечер себе: отложите телефон и насладитесь банным отдыхом без спешки. В стоимость 10 000 ₽ входят 3 часа посещения, продление стоит 2 500 ₽ за час. Дату и желаемое время нужно согласовать, халаты можно добавить отдельно.",
         ],
       ] as const
-    ).map(([id, name, summary, description]) => ({
-      id,
-      name,
-      category: "bath" as const,
-      summary,
-      description,
-      includes: [],
-      confirmation: "manual" as const,
-      times: bathTimes,
-      images: [
-        {
-          src:
-            id === "bath-paradise"
-              ? "/images/extras/sauna.jpg"
-              : `/images/extras/${id}.jpg`,
-          alt:
-            id === "bath-paradise"
-              ? "Интерьер парной — временное общее фото"
-              : `Интерьер: ${name}`,
-        },
-      ],
-      ...(id === "bath-paradise" ? { allowedHouses: ["Меридиан"] } : {}),
-      robeAddon,
+    ).flatMap(([id, name, summary, description]) => [
+      {
+        id,
+        name,
+        category: "bath" as const,
+        summary,
+        description:
+          id === "bath-vensky"
+            ? description.replace(
+                "бодрящая холодная купель, горячая бочка фурако и",
+                "бодрящая холодная купель и",
+              )
+            : description,
+        includes: [],
+        confirmation: "manual" as const,
+        times: bathTimes,
+        images: [
+          {
+            src:
+              id === "bath-paradise"
+                ? "/images/extras/sauna.jpg"
+                : `/images/extras/${id}.jpg`,
+            alt:
+              id === "bath-paradise"
+                ? "Интерьер парной — временное общее фото"
+                : `Интерьер: ${name}`,
+          },
+        ],
+        ...(id === "bath-paradise" ? { allowedHouses: ["Меридиан"] } : {}),
+        robeAddon,
+        ...(id === "bath-vensky"
+          ? {
+              price: 800000,
+              newYearPrice: 1000000,
+              unit: "за 2 часа · в праздники — 10 000 ₽",
+              hourly: { included: 2, extraHourPrice: 250000, max: 12 },
+              conditions:
+                "До бани не более 15 минут неспешной прогулки от домов Domingo Dacha в Венском Лесу и Нара Вилладж; от Игнатьево — около 15 минут на машине. Баня — 8 000 ₽ за 2 часа, с 31 декабря по 10 января включительно — 10 000 ₽. Каждый дополнительный час — 2 500 ₽. Халаты оплачиваются отдельно. Дату и время требуется подтвердить с менеджером.",
+            }
+          : {
+              price: id === "bath-gavshino" ? 750000 : 1000000,
+              unit: "за 3 часа",
+              hourly: { included: 3, extraHourPrice: 250000, max: 12 },
+              conditions:
+                "В стоимость включены 3 часа бани. Каждый дополнительный час — 2 500 ₽, халаты — 500 ₽ за штуку. Вы выбираете желаемое время; посещение требует подтверждения.",
+            }),
+      },
       ...(id === "bath-vensky"
-        ? {
-            price: 800000,
-            newYearPrice: 1000000,
-            unit: "за 2 часа · в праздники — 10 000 ₽",
-            hourly: { included: 2, extraHourPrice: 250000, max: 12 },
-            conditions: venskyConditions,
-            packageServiceId: "bath-vensky-furako" as const,
-          }
-        : {
-            price: id === "bath-gavshino" ? 750000 : 1000000,
-            unit: "за 3 часа",
-            hourly: { included: 3, extraHourPrice: 250000, max: 12 },
-            conditions:
-              "В стоимость включены 3 часа бани. Каждый дополнительный час — 2 500 ₽, халаты — 500 ₽ за штуку. Вы выбираете желаемое время; посещение требует подтверждения.",
-          }),
-    })),
-    {
-      id: "bath-vensky-furako",
-      category: "bath",
-      name: "Баня «Венский» + фурако",
-      summary: "Парная и горячая купель в одном комплексе.",
-      description: venskyDescription,
-      includes: [
-        "Баня на 4 часа",
-        "Фурако на 4 часа",
-        "Дополнительные часы бани — по 2 500 ₽",
-      ],
-      conditions: venskyConditions,
-      price: 1300000,
-      newYearPrice: 1500000,
-      unit: "баня 4 часа + фурако 4 часа",
-      confirmation: "manual",
-      hourly: { included: 4, extraHourPrice: 250000, max: 12 },
-      sessionHours: 4,
-      times: bathTimes,
-      robeAddon,
-      addon: decorationAddon,
-      images: [
-        {
-          src: "/images/extras/bath-furako-terrace.jpg",
-          alt: "Терраса комплекса «Венский» с двумя купелями",
-        },
-        {
-          src: "/images/extras/bath-vensky.jpg",
-          alt: "Баня «Венский»: парная с панорамным окном",
-        },
-      ],
-    },
+        ? [
+            {
+              id: "bath-vensky-furako" as const,
+              category: "bath" as const,
+              name: "Баня «Венский» + фурако",
+              summary: "Парная и горячая купель в одном комплексе.",
+              description: venskyDescription,
+              includes: ["Баня на 4 часа", "Фурако на 4 часа"],
+              conditions: venskyConditions,
+              price: 1300000,
+              newYearPrice: 1500000,
+              unit: "баня 4 часа + фурако 4 часа",
+              confirmation: "manual" as const,
+              hourly: { included: 4, extraHourPrice: 0, max: 4 },
+              sessionHours: 4,
+              times: bathTimes,
+              robeAddon,
+              addon: decorationAddon,
+              images: [
+                {
+                  src: "/images/extras/bath-furako-terrace.jpg",
+                  alt: "Терраса комплекса «Венский» с двумя купелями",
+                },
+                {
+                  src: "/images/extras/bath-vensky.jpg",
+                  alt: "Баня «Венский»: парная с панорамным окном",
+                },
+              ],
+            },
+          ]
+        : id === "bath-gavshino"
+          ? [
+              {
+                id: "furako-vensky" as const,
+                category: "bath" as const,
+                name: "Фурако у бани «Венский»",
+                summary: "Горячая бочка у бани — отдельный сеанс отдыха.",
+                description: furakoDescription,
+                includes: [
+                  "Подготовка купели и свежая вода",
+                  "Растопка к согласованному времени",
+                  "Инструкция по поддержанию температуры",
+                ],
+                conditions:
+                  "Фурако у бани — 7 000 ₽. Баня не входит в стоимость. Время и длительность согласовываются; халаты и украшение бочки можно добавить отдельно.",
+                price: 700000,
+                unit: "за сеанс",
+                confirmation: "manual" as const,
+                times: bathTimes,
+                robeAddon,
+                addon: decorationAddon,
+                images: [
+                  {
+                    src: "/images/extras/furako-larch.jpg",
+                    alt: "Бочка фурако у бани «Венский»",
+                  },
+                ],
+              },
+            ]
+          : []),
+    ]),
     {
       id: "bicycles",
       retired: true,
@@ -365,6 +378,24 @@ export const extrasFixture: ExtrasCatalog = {
           alt: "Велосипеды на прогулке по окрестностям",
         },
       ],
+    },
+    {
+      id: "robe",
+      category: "comfort",
+      name: "Халат",
+      summary: "Для уютного отдыха в доме — даже без посещения бани.",
+      description:
+        "Добавьте халат для неспешного отдыха в вашем домике. Его можно заказать отдельно от бани и фурако. Выберите дату и нужное количество, а время передачи мы согласуем с вами.",
+      includes: ["Халат — выбранное количество"],
+      conditions:
+        "500 ₽ за штуку. Время передачи и наличие требуют подтверждения.",
+      price: 50000,
+      unit: "за штуку",
+      quantityLabel: "Количество халатов",
+      confirmation: "manual",
+      timing: "agreement",
+      times: ["По согласованию"],
+      images: [robeAddon.image],
     },
     {
       id: "firewood",

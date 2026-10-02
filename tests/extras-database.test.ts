@@ -39,7 +39,7 @@ async function add(
         id: randomUUID(),
         serviceId,
         date: "2026-10-17",
-        time: serviceId === "furako" ? "19:00" : "09:00–09:30",
+        time: serviceId === "furako" ? "19:00" : "08:00–10:00",
         quantity: 1,
         decoration: serviceId === "furako",
       },
@@ -66,6 +66,9 @@ beforeAll(async () => {
   await db.exec(await readFile("db/migrations/0005_bath_packages.sql", "utf8"));
   await db.exec(
     await readFile("db/migrations/0007_breakfast_per_person.sql", "utf8"),
+  );
+  await db.exec(
+    await readFile("db/migrations/0008_standalone_robe.sql", "utf8"),
   );
 }, 30000);
 afterAll(async () => {
@@ -132,7 +135,7 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
       quantity: 1,
       decoration: true,
       robes: 2,
-      durationHours: 5,
+      durationHours: 4,
     };
     await repo("package").execute(
       { action: "save", version: 0, item: packageItem },
@@ -161,9 +164,9 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
     expect(
       cart.items.find((i) => i.serviceId === "bath-vensky-furako"),
     ).toMatchObject({
-      durationHours: 5,
+      durationHours: 4,
       robes: 2,
-      unitPrice: 1550000,
+      unitPrice: 1300000,
       addonPrice: 200000,
       robePrice: 50000,
     });
@@ -172,7 +175,7 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
         action: "checkout",
         version: 2,
         key: randomUUID(),
-        total: 2050000,
+        total: 1800000,
         comment: "",
       },
       stay,
@@ -180,11 +183,11 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
       now,
     );
     const [order] = await repo("package").listOrders(stay);
-    expect(order.total).toBe(2050000);
+    expect(order.total).toBe(1800000);
     expect(
       order.items.find((i) => i.serviceId === "bath-vensky-furako"),
     ).toMatchObject({
-      durationHours: 5,
+      durationHours: 4,
       robes: 2,
       decoration: true,
       fulfillmentStatus: "awaiting_approval",
@@ -194,6 +197,106 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
       unitPrice: 100000,
     });
     expect((await repo("package").getCart(stay)).items).toHaveLength(0);
+  });
+  it("saves standalone robe quantities and preserves team isolation", async () => {
+    const repository = repo("robe-team");
+    await repository.execute(
+      {
+        action: "save",
+        version: 0,
+        item: {
+          id: randomUUID(),
+          serviceId: "robe",
+          date: "2026-10-17",
+          time: "По согласованию",
+          quantity: 2,
+          decoration: false,
+        },
+      },
+      stay,
+      catalog,
+      now,
+    );
+    await repository.execute(
+      {
+        action: "checkout",
+        version: 1,
+        total: 100000,
+        key: randomUUID(),
+        comment: "",
+      },
+      stay,
+      catalog,
+      now,
+    );
+    const [order] = await repository.listOrders(stay);
+    expect(order.items[0]).toMatchObject({
+      serviceId: "robe",
+      quantity: 2,
+      unitPrice: 50000,
+      fulfillmentStatus: "awaiting_approval",
+    });
+    expect(await repo("robe-other-team").listOrders(stay)).toEqual([]);
+  });
+  it("persists the revised delivery window and fixed duration when an old cart is repriced", async () => {
+    const old = structuredClone(catalog);
+    const breakfast = old.services.find((s) => s.id === "breakfast")!;
+    breakfast.deliveryWindow = undefined;
+    breakfast.times = ["09:00–09:30"];
+    old.services.find((s) => s.id === "bath-vensky-furako")!.hourly = {
+      included: 4,
+      max: 12,
+      extraHourPrice: 250000,
+    };
+    const repository = repo("old-options");
+    for (const [version, serviceId] of (
+      ["breakfast", "bath-vensky-furako"] as const
+    ).entries()) {
+      await repository.execute(
+        {
+          action: "save",
+          version,
+          item: {
+            id: randomUUID(),
+            serviceId,
+            date: "2026-10-17",
+            time: serviceId === "breakfast" ? "09:00–09:30" : "16:00",
+            quantity: 1,
+            decoration: false,
+            ...(serviceId === "bath-vensky-furako" ? { durationHours: 5 } : {}),
+          },
+        },
+        stay,
+        old,
+        now,
+      );
+    }
+    await repository.execute(
+      { action: "reprice", version: 2 },
+      stay,
+      catalog,
+      now,
+    );
+    const cart = await repository.getCart(stay);
+    expect(cart.items.find((i) => i.serviceId === "breakfast")).toMatchObject({
+      time: "08:00–10:00",
+    });
+    expect(
+      cart.items.find((i) => i.serviceId === "bath-vensky-furako"),
+    ).toMatchObject({ durationHours: 4, unitPrice: 1300000 });
+    await repository.execute(
+      {
+        action: "checkout",
+        version: 3,
+        total: 1390000,
+        key: randomUUID(),
+        comment: "",
+      },
+      stay,
+      catalog,
+      now,
+    );
+    expect(await repository.listOrders(stay)).toHaveLength(1);
   });
   it("preserves historical order prices while migrating defaults for new options", async () => {
     const [order] = await repo("legacy").listOrders(stay);
@@ -313,7 +416,7 @@ describe("extras PostgreSQL persistence (isolated, no server or external databas
     ).toBe("confirmed");
     expect(
       order?.items.find((i) => i.serviceId === "breakfast")?.confirmedTime,
-    ).toBe("09:00–09:30");
+    ).toBe("08:00–10:00");
     expect((await repo("checkout").getCart(stay)).items).toHaveLength(0);
     expect(
       (await repo("checkout").execute(command, stay, catalog, now))?.id,
