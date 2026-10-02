@@ -746,20 +746,25 @@ export function ExtrasApp(props: Props) {
                 </>
               )}
               {service.addon && (
-                <label className="extras-addon">
-                  <input
-                    type="checkbox"
-                    checked={draft.decoration}
-                    disabled={busy}
-                    onChange={(event) =>
-                      updateDraft({ decoration: event.target.checked })
-                    }
-                  />
-                  <span>
-                    {service.addon.name}
-                    <small>+{money(service.addon.price)}</small>
-                  </span>
-                </label>
+                <>
+                  {service.addon.image && (
+                    <ServicePhoto picture={service.addon.image} />
+                  )}
+                  <label className="extras-addon">
+                    <input
+                      type="checkbox"
+                      checked={draft.decoration}
+                      disabled={busy}
+                      onChange={(event) =>
+                        updateDraft({ decoration: event.target.checked })
+                      }
+                    />
+                    <span>
+                      {service.addon.name}
+                      <small>+{money(service.addon.price)}</small>
+                    </span>
+                  </label>
+                </>
               )}
               {service.firAddon && (
                 <>

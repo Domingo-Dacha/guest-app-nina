@@ -5,6 +5,15 @@ import type { ExtrasCatalog } from "@/data/contracts/extras";
 const furakoDescription =
   "Попробуйте новый вид парения. Бочка из лиственницы растапливается дровами.\n\nМы не добавляем никаких химикатов в воду, только натуральное парение.\n\nБочка моется, наливается свежая вода и растапливается к назначенному времени перед каждым гостем. Далее вы самостоятельно поддерживаете комфортную температуру, чтобы мы не мешали вам своим присутствием. Учитывайте, что это определённые усилия: открыть печку, подбросить брикеты, размешать воду, чтобы довести до комфортной температуры. Подробную инструкцию мы пришлём.\n\nМы всегда на связи и можем приехать помочь в случае необходимости.";
 
+const decorationAddon = {
+  name: "Украшение в бочку",
+  price: 200000,
+  image: {
+    src: "/images/extras/barrel-decoration.jpg",
+    alt: "Украшение бочки: хвойные ветви и дольки грейпфрута на воде",
+  },
+};
+
 const bathTimes = Array.from({ length: 12 }, (_, index) => `${index + 10}:00`);
 const robeAddon = {
   name: "Халат",
@@ -124,7 +133,8 @@ export const extrasFixture: ExtrasCatalog = {
       id: "furako",
       category: "bath",
       name: "Бочка фурако",
-      summary: "Тёплая вода, свежий воздух и вечер без спешки.",
+      summary:
+        "Парение в бочке из лиственницы под открытым небом. Горячая вода, свежий воздух – идеальный способ замедлиться и отдохнуть",
       description: furakoDescription,
       includes: [
         "Подготовка и наполнение купели",
@@ -160,7 +170,7 @@ export const extrasFixture: ExtrasCatalog = {
         "20:00",
         "21:00",
       ],
-      addon: { name: "Украшение в бочку", price: 200000 },
+      addon: decorationAddon,
       firAddon: {
         name: "Сибирская пихта",
         price: 200000,
@@ -241,7 +251,7 @@ export const extrasFixture: ExtrasCatalog = {
       confirmation: "manual",
       times: bathTimes,
       robeAddon,
-      addon: { name: "Украшение в бочку", price: 200000 },
+      addon: decorationAddon,
       images: [
         {
           src: "/images/extras/furako-larch.jpg",
@@ -330,7 +340,7 @@ export const extrasFixture: ExtrasCatalog = {
       sessionHours: 4,
       times: bathTimes,
       robeAddon,
-      addon: { name: "Украшение в бочку", price: 200000 },
+      addon: decorationAddon,
       images: [
         {
           src: "/images/extras/bath-furako-terrace.jpg",
@@ -370,6 +380,12 @@ export const extrasFixture: ExtrasCatalog = {
       id: "firewood",
       category: "comfort",
       name: "Дрова",
+      images: [
+        {
+          src: "/images/extras/firewood.jpg",
+          alt: "Связка дров на деревянной террасе",
+        },
+      ],
       summary: "Запас дров для уютного вечера у огня.",
       description:
         "Добавьте к отдыху дрова, чтобы провести вечер у огня. Одна упаковка весом 5 кг стоит 1 000 ₽. Выберите нужное количество упаковок и дату. Время передачи дров согласовывается отдельно.",

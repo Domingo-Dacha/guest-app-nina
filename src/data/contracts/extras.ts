@@ -49,7 +49,11 @@ export type ExtraService = {
   times: string[];
   retired?: boolean;
   telegramOrder?: { username: string };
-  addon?: { name: string; price: number };
+  addon?: {
+    name: string;
+    price: number;
+    image?: { src: string; alt: string };
+  };
   firAddon?: {
     name: string;
     price: number;
