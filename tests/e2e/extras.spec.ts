@@ -360,7 +360,9 @@ test("bath package preserves dates, hours and robes, and firewood keeps quantiti
     page.getByRole("button", { name: /Добавить фурако/ }),
   ).toHaveCount(0);
   await expect(page.locator(".extras-detail-copy")).not.toContainText("фурако");
-  await page.goto("/extras?view=service&service=bath-vensky-furako");
+  await page.goto("/extras?view=service&service=bath-vensky-furako", {
+    waitUntil: "domcontentloaded",
+  });
   await page.getByLabel("Дата", { exact: true }).selectOption("2026-10-17");
   await page.getByLabel("Желаемое время начала").selectOption("16:00");
   await expect(page.getByLabel("Длительность бани")).toHaveCount(0);
@@ -436,7 +438,9 @@ test("New Year tariffs follow the selected date and separate sauna furako costs 
     page.getByRole("button", { name: /Добавить в корзину/ }),
   ).toContainText(/10\s*000/);
   await expect(page.getByText(/Применён новогодний тариф/)).toBeVisible();
-  await page.goto("/extras?view=service&service=bath-vensky-furako");
+  await page.goto("/extras?view=service&service=bath-vensky-furako", {
+    waitUntil: "domcontentloaded",
+  });
   await page.getByLabel("Дата", { exact: true }).selectOption("2026-12-31");
   await page.getByLabel("Желаемое время начала").selectOption("16:00");
   await expect(
@@ -714,9 +718,9 @@ test("guest copy, service order and empty-category links stay consistent", async
     await page
       .getByRole("button", { name: `Выбрать: ${name}`, exact: true })
       .click();
-    await expect(page.locator(".extras-detail-copy > p")).toHaveText(
-      description,
-    );
+    await expect(
+      page.locator(".extras-detail-copy > p:not(.extras-note)"),
+    ).toHaveText(description);
     const widths = await page.evaluate(() => [
       document.documentElement.scrollWidth,
       document.documentElement.clientWidth,
